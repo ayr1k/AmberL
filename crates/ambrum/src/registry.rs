@@ -26,7 +26,7 @@ struct ObjectId {
     created: u64,
 }
 
-fn info(file: &File) -> Result<BY_HANDLE_FILE_INFORMATION> {
+pub(crate) fn info(file: &File) -> Result<BY_HANDLE_FILE_INFORMATION> {
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
     if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
         return Err(std::io::Error::last_os_error().to_string());
@@ -37,7 +37,7 @@ fn info(file: &File) -> Result<BY_HANDLE_FILE_INFORMATION> {
     Ok(info)
 }
 
-fn options() -> OpenOptions {
+pub(crate) fn options() -> OpenOptions {
     let mut options = OpenOptions::new();
     options
         .read(true)
@@ -46,13 +46,13 @@ fn options() -> OpenOptions {
     options
 }
 
-struct DirectoryGuard {
-    root: PathBuf,
+pub(crate) struct DirectoryGuard {
+    pub(crate) root: PathBuf,
     id: ObjectId,
     _handles: Vec<File>,
 }
 impl DirectoryGuard {
-    fn open(path: &Path) -> Result<Self> {
+    pub(crate) fn open(path: &Path) -> Result<Self> {
         // Do not canonicalize away a junction before validating the original path.
         let root = paths::ordinary(path)?;
         let mut handles = Vec::new();
@@ -82,7 +82,7 @@ impl DirectoryGuard {
     }
 }
 
-fn new_id() -> Result<String> {
+pub(crate) fn new_id() -> Result<String> {
     let mut guid = windows_sys::core::GUID::default();
     if unsafe { CoCreateGuid(&mut guid) } < 0 {
         return Err("Cannot create library ID".into());

@@ -23,6 +23,9 @@
 - `ambrum::task`: cancellation token; no speculative generic task framework.
 - `ambrum::registry` (Windows): app-only registration, GUID identities, directory handles,
   serialized writes and same-directory staged replacement. No game-file write capability.
+- `ambrum::download` (Windows cache adapter): bounded streaming, cancellation, progress,
+  hash-keyed locks, verified cache reuse, same-directory commit. HTTP is an injected
+  `Transport`; Windows WinHTTP and CNG implement TLS and hashes without custom protocols.
 - `amberl-inspect`: independent CLI for reproducible inspection.
 - `amberl-native-probe`: Win32 standard controls, virtual list, background worker.
 
@@ -41,6 +44,17 @@ This is app configuration persistence, not a journal/backup engine for game file
 writers, hostile same-user processes and power-loss/storage failures are not fully modeled.
 Only the local Windows filesystem used in the recorded tests is verified; network, ReFS,
 removable filesystems and cross-machine directory identity need separate evaluation.
+
+Download attempts use 64 KiB buffers, a 16 GiB descriptor ceiling and a 30-minute attempt
+budget checked between blocking operations. WinHTTP uses five-second phase timeouts;
+these are not a hard total cancellation latency guarantee. Progress is coalesced to
+roughly ten updates/second plus phase transitions. Success is emitted only after commit.
+TLS uses OS certificate validation. Cookies, automatic auth/logon and redirects are disabled.
+URLs are not included in diagnostics; the cache contains no account credentials.
+Retry starts a new attempt; there is no automatic retry storm or partial HTTP resume.
+Normal failures/cancellation remove staged files; process-crash residue is ignored, with
+cache quota/cleanup and crash-recovery UI still pending. No archive extraction or game
+installation is implemented, and returned cache paths do not authorize later game writes.
 
 ## UI decision remains open
 Compare Slint and WinUI 3 on the same actual scan/list/input/task/log data. egui is an

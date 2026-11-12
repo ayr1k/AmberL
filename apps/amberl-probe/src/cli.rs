@@ -8,7 +8,9 @@ fn main() {
         [command, path] if command == "java" => ambrum::java::inspect(Path::new(path), &Cancellation::default()).and_then(|j| serde_json::to_string_pretty(&j).map_err(|e| e.to_string())),
         #[cfg(windows)]
         [command, directory, rest @ ..] if command == "libraries" => registered(Path::new(directory), rest),
-        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe>\nRead-only probe. Does not install or launch Minecraft.".into()),
+        #[cfg(windows)]
+        [command, directory, url, digest, size] if command == "fetch" => fetch(Path::new(directory), url.to_str(), digest.to_str(), size.to_str()),
+        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
     };
     match result {
         Ok(output) => println!("{output}"),
@@ -17,6 +19,57 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+#[cfg(windows)]
+fn fetch(
+    directory: &Path,
+    url: Option<&str>,
+    checksum: Option<&str>,
+    size: Option<&str>,
+) -> ambrum::Result<String> {
+    use ambrum::download::{Algorithm, Artifact, Cache, Https};
+    use windows_sys::Win32::System::Console::*;
+    static CANCEL: std::sync::OnceLock<Cancellation> = std::sync::OnceLock::new();
+    unsafe extern "system" fn interrupt(event: u32) -> i32 {
+        if matches!(event, CTRL_C_EVENT | CTRL_BREAK_EVENT) {
+            if let Some(token) = CANCEL.get() {
+                token.cancel();
+            }
+            1
+        } else {
+            0
+        }
+    }
+    let (algorithm, digest) = checksum
+        .and_then(|s| s.split_once(':'))
+        .ok_or("Expected sha1:hex or sha256:hex")?;
+    let artifact = Artifact {
+        url: url.ok_or("Invalid URL encoding")?.into(),
+        algorithm: match algorithm {
+            "sha1" => Algorithm::Sha1,
+            "sha256" => Algorithm::Sha256,
+            _ => return Err("Unsupported digest algorithm".into()),
+        },
+        digest: digest.into(),
+        size: size
+            .and_then(|s| s.parse().ok())
+            .ok_or("Invalid byte count")?,
+    };
+    let token = CANCEL.get_or_init(Cancellation::default);
+    let handler = unsafe { SetConsoleCtrlHandler(Some(interrupt), 1) } != 0;
+    let result = Cache::open(directory).and_then(|cache| {
+        cache.fetch(&artifact, &Https, token, |p| {
+            // No URL/headers/tokens in progress or diagnostics.
+            eprintln!("{:?}: {}/{}", p.phase, p.received, p.total);
+        })
+    });
+    if handler {
+        unsafe {
+            SetConsoleCtrlHandler(Some(interrupt), 0);
+        }
+    }
+    serde_json::to_string_pretty(&result?).map_err(|e| e.to_string())
 }
 
 #[cfg(windows)]

@@ -12,6 +12,8 @@ memchr offers Unlicense or MIT, and zmij is MIT. The packaging script
 includes original license files from the exact resolved crates; those texts govern.
 Rust standard libraries are MIT OR Apache-2.0 and carry additional third-party notices.
 Windows system libraries and system fonts are used from the OS, not redistributed.
+The download adapter also calls Windows WinHTTP (TLS/system certificates) and CNG
+(SHA-1/SHA-256). No separate networking/crypto runtime is bundled.
 
 No Slint, egui, WinUI, Minecraft, Java, mod or FRP binary is redistributed by this probe.
 Dependencies and notices must be reviewed again as those capabilities are introduced.

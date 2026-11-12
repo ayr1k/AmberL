@@ -10,6 +10,7 @@ if (Test-Path -LiteralPath $packageRoot) { throw 'Package already exists; retain
 New-Item -ItemType Directory -Path $packageRoot | Out-Null
 Copy-Item target/release/amberl-native-probe.exe,target/release/amberl-inspect.exe,LICENSE,README.md,THIRD_PARTY_NOTICES.md,Cargo.lock -Destination $packageRoot
 Copy-Item docs -Destination $packageRoot -Recurse
+Copy-Item scripts/test-download-network.ps1 -Destination $packageRoot
 $sourceArchive = Join-Path $packageRoot 'AmberL-source.zip'
 git archive --format=zip "--output=$sourceArchive" HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot archive the exact source revision.' }

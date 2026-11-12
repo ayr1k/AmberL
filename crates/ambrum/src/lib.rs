@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! UI-independent library inspection. This milestone never modifies a game library.
+#[cfg(windows)]
+pub mod download;
 pub mod java;
 pub mod library;
 pub mod paths;

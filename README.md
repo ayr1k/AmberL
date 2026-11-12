@@ -14,12 +14,14 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - Cancellable background scan, virtual native Windows list, search and inspectable diagnostics.
 - Persistent Windows library list: preview, attach, reopen by stable ID and detach without deleting game files.
 - Handle-checked directory identity, exclusive registry lock and staged app-only saves.
+- Streaming HTTPS artifact cache with size + SHA-1/SHA-256 verification, cancellation,
+  explicit retry and corrupt-cache recovery (core/CLI; not game installation).
 - CLI Java executable inspection with timeout, cancellation and bounded output.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
 not a substitute for the Slint/WinUI selection experiment. No WebView or Node process.
-All game mutations, login, downloads and process supervision
+All game mutations, login, game/content download workflows and process supervision
 remain future work. A detected loader is **not** a claim of launch compatibility.
 
 ## Try the development probe / 试用开发样机
@@ -32,13 +34,25 @@ Path replacement or damaged configuration produces an error and preserves the ol
 
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
-当前包是免安装技术样机，不能登录、下载、启动游戏或联机；外观不是最终设计。
+当前包是免安装技术样机，不能登录、安装和启动游戏或联机；外观不是最终设计。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
 For isolated testing, create an empty app-data directory and pass
 `--data-dir <directory>` to the native probe. Do not use a game directory as app data.
 CLI registry operations: `amberl-inspect libraries <app-directory>` with optional
 `add <library>`, `scan <registered-id>` or `remove <registered-id>`.
+
+Developer download probe (Windows, app cache only):
+`amberl-inspect fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes>`.
+Progress is on stderr; success JSON is on stdout. Ctrl+C requests cancellation; a blocked
+OS call returns on its network timeout. Retry explicitly with the same descriptor.
+Expected hashes must come from trusted provider metadata; SHA-1 compatibility is not
+a signature/authenticity guarantee. No bearer credentials are accepted by this downloader.
+The package includes `test-download-network.ps1`, which fetches a pinned public license
+and checks cache reuse. This host's live attempt was blocked by DNS (Windows 12007).
+
+新增下载核心与命令行测试入口：暂存、取消、失败重试、大小和哈希校验、缓存复用。
+尚未接入游戏安装或内容搜索界面；本机真实网络请求仍因 DNS 解析失败而未通过。
 
 ## Build / 构建
 

@@ -44,8 +44,28 @@ acceptance from compilation, synthetic inspection or a visible launcher window.
 - Rendered UI, Chinese input, accessibility, per-monitor DPI and AMBER resource baseline.
 - GitHub repository creation, source upload, CI execution and downloadable PR delivery.
 
+## Continued milestone: verified downloads
+- Eight targeted download tests passed with injected streaming transports and actual
+  Windows CNG/file operations: known SHA-1/SHA-256 vectors and cache reuse; short/long/
+  corrupt payloads; cancellation before request and commit; interrupted transfer and
+  explicit retry; corrupt-cache replacement and failed commit preserving the old file;
+  concurrent artifact exclusion; invalid URLs/digests; hardlink/game-root protection.
+- This does not establish HTTP/TLS success: a real WinHTTP request for AMBER's LICENSE
+  at 3af52c7 failed with Windows 12007 (DNS resolution). No artifact was committed.
+  The expected 16,726-byte fixture and SHA-256 were independently obtained through
+  the authenticated GitHub connector. The bundled network smoke script can be run
+  from a normal Windows terminal; it reports failure honestly and requires a fresh download.
+- rustfmt, strict Clippy and release build passed. Existing unrelated library/UI tests
+  were not repeated for this separate module. Earlier native UI evidence remains the
+  f28cdba milestone's evidence, not a new visual acceptance result.
+- The newly connected GitHub identity was confirmed as ayr1k. `ayr1k/AmberL` still returned
+  404, and the connector has no repository-creation action. Upload/PR remains pending
+  creation of a repository with an initial commit (for example an initialized README).
+- Remaining: live network success, redirect/provider policy, resumable downloads,
+  game manifest/planning and installation, task UI, login and visible game launch.
+
 ## Limits
-No Minecraft authentication, visible game/world, installation, download, backup,
+No Minecraft authentication, visible game/world, installation, content download UI, backup,
 recovery, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
 Slint/WinUI selection, full Chinese IME/reader/DPI matrix and AMBER resource comparison
 remain pending. Probe footprint cannot predict completed product footprint.
