@@ -4,6 +4,8 @@
 pub mod download;
 pub mod java;
 pub mod library;
+#[cfg(windows)]
+pub mod manifest;
 pub mod paths;
 #[cfg(windows)]
 pub mod registry;

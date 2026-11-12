@@ -17,6 +17,8 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - Streaming HTTPS artifact cache with size + SHA-1/SHA-256 verification, cancellation,
   explicit retry and corrupt-cache recovery (core/CLI; not game installation).
 - CLI Java executable inspection with timeout, cancellation and bounded output.
+- Read-only Vanilla version/asset plans with platform rules, Java requirements,
+  separate native archives, exact argument boundaries and conflicting-path rejection.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
@@ -53,6 +55,16 @@ and checks cache reuse. This host's live attempt was blocked by DNS (Windows 120
 
 新增下载核心与命令行测试入口：暂存、取消、失败重试、大小和哈希校验、缓存复用。
 尚未接入游戏安装或内容搜索界面；本机真实网络请求仍因 DNS 解析失败而未通过。
+
+Metadata planning (Windows x64, no network or game writes):
+`amberl-inspect plan-vanilla <metadata.json> <windows-os-version>` and
+`amberl-inspect plan-assets <asset-index.json>` print JSON plans.
+Use an explicit OS version, for example `10.0.26100`; this is not a readiness check.
+Only standalone Vanilla metadata with explicit download descriptors is supported.
+Inherited/loader metadata and custom entrypoints return errors instead of partial plans.
+
+版本与资源索引可生成只读计划，保留 Java 要求、平台规则和资源映射；
+未知 Java 要求保持未知。计划成功不代表完成下载、安装或游戏启动。
 
 ## Build / 构建
 

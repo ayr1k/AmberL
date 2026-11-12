@@ -6,7 +6,8 @@ AMBER artwork/fonts or Electron runtime are included.
 
 The initial locked Rust graph includes serde/serde_core/serde_derive,
 serde_json, proc-macro2, quote, syn, unicode-ident, itoa, memchr, zmij,
-windows-sys and windows-link. Exact versions are in Cargo.lock. Most are
+windows-sys and windows-link. The metadata planner adds regex, regex-automata,
+regex-syntax and aho-corasick (MIT OR Apache-2.0). Exact versions are in Cargo.lock. Most are
 MIT OR Apache-2.0; unicode-ident requires Unicode-3.0 in addition to MIT or Apache-2.0,
 memchr offers Unlicense or MIT, and zmij is MIT. The packaging script
 includes original license files from the exact resolved crates; those texts govern.

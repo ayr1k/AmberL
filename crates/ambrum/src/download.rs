@@ -50,6 +50,9 @@ pub struct Artifact {
     pub digest: String,
 }
 impl Artifact {
+    pub fn validate(&self) -> Result<()> {
+        self.key().map(|_| ())
+    }
     fn key(&self) -> Result<String> {
         Https::validate(&self.url)?;
         if self.size > 16 * 1024 * 1024 * 1024

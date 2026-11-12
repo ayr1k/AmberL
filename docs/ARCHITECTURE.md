@@ -27,6 +27,8 @@
   hash-keyed locks, verified cache reuse, same-directory commit. HTTP is an injected
   `Transport`; Windows WinHTTP and CNG implement TLS and hashes without custom protocols.
 - `amberl-inspect`: independent CLI for reproducible inspection.
+- `ambrum::manifest` (currently Windows): pure Vanilla/resource plans with ordered
+  platform/feature rules and bounded regexes. No authentication, network, writes or execution.
 - `amberl-native-probe`: Win32 standard controls, virtual list, background worker.
 
 Unregistered inspection uses canonical path + profile name. Registered scans use a GUID
@@ -55,6 +57,13 @@ Retry starts a new attempt; there is no automatic retry storm or partial HTTP re
 Normal failures/cancellation remove staged files; process-crash residue is ignored, with
 cache quota/cleanup and crash-recovery UI still pending. No archive extraction or game
 installation is implemented, and returned cache paths do not authorize later game writes.
+
+Version planning preserves argument arrays, explicit Java requirements, native archive
+separation and legacy asset mappings. It rejects custom entrypoints, inherited metadata,
+Maven-only descriptors, unsupported extraction/logging rules and conflicting destinations.
+Assets are deduplicated by hash with an ordered map; up to 100,000 logical objects are
+accepted. Plans are not mutation authority or authenticated metadata. Installation must
+independently validate resource ownership, archives and actual file state before committing.
 
 ## UI decision remains open
 Compare Slint and WinUI 3 on the same actual scan/list/input/task/log data. egui is an

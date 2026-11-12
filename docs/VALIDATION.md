@@ -64,6 +64,40 @@ acceptance from compilation, synthetic inspection or a visible launcher window.
 - Remaining: live network success, redirect/provider policy, resumable downloads,
   game manifest/planning and installation, task UI, login and visible game launch.
 
+## Continued milestone: Vanilla metadata plans (2026-11-12)
+- Nine manifest tests passed: ordered platform/feature rules; argument boundaries and
+  format limits; platform-specific libraries/native archives; invalid/conflicting paths;
+  unsupported inheritance/entrypoints; unknown Java requirements; deduplicated asset
+  mappings; conflicting asset sizes; missing required OS version stays an error.
+- rustfmt, strict Clippy and release build passed. Existing unrelated inspection/registry/
+  UI tests retain their prior evidence; they were not rerun for this pure planner.
+- Read-only CLI checks against two existing QA-copy Vanilla descriptors succeeded:
+
+| Version | Required Java | Planned files | Classpath entries | Metadata SHA-256 |
+|---|---:|---:|---:|---|
+| 1.21.4 | 21 | 87 | 85 | `110a9db5df120e614728e248ee0d705af07438d1de1d261bc7c3c85d17cf8e12` |
+| 26.3 | 25 | 77 | 75 | `7755c56601d666849aad5b4266503cacc17dac1b747018fccd5a19201b3dda82` |
+
+Both used explicit OS version `10.0.26100` and planned zero legacy native archives.
+These are metadata checks, not successful downloads/installation/launches. No personal
+account files or game content are included. `plan-assets` CLI also passed a synthetic
+two-name/one-hash deduplication check.
+
+## Delivery/network checkpoint (2026-11-12; supersedes earlier 404 reports)
+- `ayr1k/AmberL` exists. Remote `main` is initial commit
+  `b6abee821f2354014e22b289f9e1b340bbd0c159`; complete branch pagination showed only
+  `main`, and PR search returned no PRs. No duplicate upload was found.
+- The explicitly selected ayr1k connection still returns GitHub 403
+  `Resource not accessible by integration` for `create_blob`. Earlier attempts to create
+  a tree/branch also failed. Installed-account enumeration is empty. Metadata reporting
+  push permission did not establish integration write access. No remote commit/branch/PR
+  was created; the cause of the authorization mismatch has not been proven.
+- Retrying the actual compiled WinHTTP downloader still failed with Windows 12007 (DNS),
+  leaving zero committed download files. This remains separate from GitHub delivery.
+- The retained local history and source ZIP are the recovery path. When writes are
+  available, the upload must parent remote main, preserve local history, record the
+  local/API commit mapping, and verify remote files and a Draft PR without force-pushing.
+
 ## Limits
 No Minecraft authentication, visible game/world, installation, content download UI, backup,
 recovery, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.

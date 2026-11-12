@@ -10,7 +10,11 @@ fn main() {
         [command, directory, rest @ ..] if command == "libraries" => registered(Path::new(directory), rest),
         #[cfg(windows)]
         [command, directory, url, digest, size] if command == "fetch" => fetch(Path::new(directory), url.to_str(), digest.to_str(), size.to_str()),
-        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
+        #[cfg(windows)]
+        [command, metadata, os_version] if command == "plan-vanilla" => plan(Path::new(metadata), os_version.to_str()),
+        #[cfg(windows)]
+        [command, index] if command == "plan-assets" => plan_assets(Path::new(index)),
+        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
     };
     match result {
         Ok(output) => println!("{output}"),
@@ -19,6 +23,26 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+#[cfg(windows)]
+fn plan_assets(path: &Path) -> ambrum::Result<String> {
+    let path = ambrum::paths::ordinary(path)?;
+    let index = ambrum::paths::json(path.parent().ok_or("Missing index parent")?, &path)?;
+    let plan = ambrum::manifest::AssetPlan::parse(&index)?;
+    serde_json::to_string_pretty(&plan).map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn plan(path: &Path, os_version: Option<&str>) -> ambrum::Result<String> {
+    let path = ambrum::paths::ordinary(path)?;
+    let root = path.parent().ok_or("Missing metadata parent")?;
+    let metadata = ambrum::paths::json(root, &path)?;
+    let plan = ambrum::manifest::VersionPlan::parse(
+        &metadata,
+        &ambrum::manifest::Platform::windows_x64(os_version.ok_or("Invalid Windows version")?),
+    )?;
+    serde_json::to_string_pretty(&plan).map_err(|e| e.to_string())
 }
 
 #[cfg(windows)]

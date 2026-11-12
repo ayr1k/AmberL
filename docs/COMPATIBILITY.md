@@ -27,6 +27,20 @@ replacement. Registered scans additionally guard the root and its ancestors by h
 individual game metadata remains read-only. Game writes remain disabled until the resource
 transaction and shared-content locking layer exists. Registry detach is not game deletion.
 
+## Metadata planning only
+
+Standalone Vanilla `net.minecraft.client.main.Main` metadata supports ordered Mojang
+rules, explicit SHA-1/size download descriptors, current-platform libraries, legacy native
+classifiers, modern argument arrays, unquoted legacy arguments and log4j2 descriptors.
+Limits: 4,096 libraries/arguments, 32,768 bytes per argument, 100,000 asset objects.
+The CLI uses Windows x64/Java `amd64` rules with an explicitly supplied OS version.
+Unknown Java requirements remain unknown. Inheritance/loaders, quoted legacy arguments,
+Maven-only libraries and custom entrypoints/extraction rules are explicitly unsupported.
+Asset hash deduplication preserves logical names and virtual/resource layout flags.
+No extraction, installation, argument substitution, credential handling or launch is implied.
+
+只读计划支持原版描述与资源索引；实际安装、启动及第三方加载器兼容仍未验收。
+
 ## Stable matrix to populate
 Each evidence row must pin layout sample, Minecraft/loader version, isolation mode,
 Java/OS/architecture and source revision. Separate columns: identify / launch / install /
