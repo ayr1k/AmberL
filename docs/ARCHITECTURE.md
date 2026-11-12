@@ -21,13 +21,26 @@
 - `ambrum::paths`: bounded reads and conservative reparse/traversal rejection.
 - `ambrum::java`: bounded inspection of explicitly selected executables.
 - `ambrum::task`: cancellation token; no speculative generic task framework.
+- `ambrum::registry` (Windows): app-only registration, GUID identities, directory handles,
+  serialized writes and same-directory staged replacement. No game-file write capability.
 - `amberl-inspect`: independent CLI for reproducible inspection.
 - `amberl-native-probe`: Win32 standard controls, virtual list, background worker.
 
-Current identity uses canonical library path + profile name and is session-only.
-Before persistence/mutation, add stable registry IDs, filesystem object identity and
-handle-based revalidation. Deserialization is not permission to access a directory.
-Win32 unsafe calls are confined to the UI adapter. No game writes or launches exist.
+Unregistered inspection uses canonical path + profile name. Registered scans use a GUID
+plus profile name, and reopen/revalidate the stored volume/index/creation identity.
+Registry scans keep non-delete-sharing handles to the directory and its ancestors.
+All paths are checked for reparses before use; this conservative implementation can reject
+otherwise legitimate linked libraries. Actual game contents are still read-only and are
+not locked against external launchers. Deserialization does not authorize game mutations.
+Win32 unsafe calls live in the UI and Windows registry adapters. No game writes/launches exist.
+
+The registry holds a non-delete-sharing lock file with an exclusive OS lock; concurrent
+writers fail fast. Updates write/sync a unique new file before same-directory replacement.
+Uncommitted temporary files are ignored. Invalid/unknown schemas are preserved, not reset.
+This is app configuration persistence, not a journal/backup engine for game files. Third-party
+writers, hostile same-user processes and power-loss/storage failures are not fully modeled.
+Only the local Windows filesystem used in the recorded tests is verified; network, ReFS,
+removable filesystems and cross-machine directory identity need separate evaluation.
 
 ## UI decision remains open
 Compare Slint and WinUI 3 on the same actual scan/list/input/task/log data. egui is an
@@ -49,7 +62,7 @@ Reject unusable input/accessibility even if package size is attractive.
 
 ## Next concrete slice
 Resolve dependency access and GitHub delivery; compare UI samples. In parallel with UI
-work, add persistent app-only library registry and safe file identity, then authenticated
+work, extend identity/transactions to actual game resources, then authenticated
 Vanilla launch from a disposable fixture. Verify Java 8 and modern Java plus actual
 visible menus/worlds before scaling out loaders. Auth and OS credential storage belong
 early in the vertical slice. Server lifecycle feasibility also precedes full local polish.

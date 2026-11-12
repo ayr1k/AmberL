@@ -20,9 +20,12 @@ All real Minecraft launching/installing/mutating/restoring is currently unimplem
 
 Limits: 8 MiB metadata files, 16 inheritance levels, 20,000 profile directories, bounded
 JSON parsing. Scanning can be cancelled between filesystem operations, but a blocked
-OS filesystem read is not promised to interrupt immediately. No persistent library registry.
+OS filesystem read is not promised to interrupt immediately. Windows app-only registration
+supports up to 256 libraries; missing/replaced roots fail when opened, retaining registration.
 The read-only path strategy does not guarantee isolation against hostile concurrent path
-replacement. All writes remain disabled until stronger identity/transaction support exists.
+replacement. Registered scans additionally guard the root and its ancestors by handles;
+individual game metadata remains read-only. Game writes remain disabled until the resource
+transaction and shared-content locking layer exists. Registry detach is not game deletion.
 
 ## Stable matrix to populate
 Each evidence row must pin layout sample, Minecraft/loader version, isolation mode,

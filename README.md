@@ -12,13 +12,33 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - Explicit library/client/server identities; conflicting or absent isolation stays unresolved.
 - Official profile, per-version PCL/HMCL directory evidence; bounded JSON and inheritance.
 - Cancellable background scan, virtual native Windows list, search and inspectable diagnostics.
+- Persistent Windows library list: preview, attach, reopen by stable ID and detach without deleting game files.
+- Handle-checked directory identity, exclusive registry lock and staged app-only saves.
 - CLI Java executable inspection with timeout, cancellation and bounded output.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
 not a substitute for the Slint/WinUI selection experiment. No WebView or Node process.
-Library attachment persistence, all mutations, login, downloads and process supervision
+All game mutations, login, downloads and process supervision
 remain future work. A detected loader is **not** a claim of launch compatibility.
+
+## Try the development probe / 试用开发样机
+
+Unzip the development package and run `amberl-native-probe.exe`. Choose a **copy** of
+a game library, scan it, then click **添加此库**. Select a saved library in the dropdown
+to scan it again. **移除登记** removes only the registration, never the game files.
+The independent registry lives at `%LOCALAPPDATA%/io.github.ayr1k.amberl/libraries.json`.
+Path replacement or damaged configuration produces an error and preserves the old record.
+
+解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
+关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
+当前包是免安装技术样机，不能登录、下载、启动游戏或联机；外观不是最终设计。
+包内包含对应源码压缩包、修订号、校验值和依赖许可。
+
+For isolated testing, create an empty app-data directory and pass
+`--data-dir <directory>` to the native probe. Do not use a game directory as app data.
+CLI registry operations: `amberl-inspect libraries <app-directory>` with optional
+`add <library>`, `scan <registered-id>` or `remove <registered-id>`.
 
 ## Build / 构建
 
@@ -30,6 +50,7 @@ cargo build --workspace --release --locked
 ./target/release/amberl-native-probe.exe
 ./target/release/amberl-inspect.exe scan 'D:\Games\.minecraft'
 ./target/release/amberl-inspect.exe java 'C:\Java\bin\java.exe'
+./scripts/test-native-probe.ps1
 ```
 
 Use disposable fixtures or verified copies of game libraries. The current probe is
