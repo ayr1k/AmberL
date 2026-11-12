@@ -13,8 +13,32 @@ Copy-Item docs -Destination $packageRoot -Recurse
 Copy-Item scripts/test-download-network.ps1 -Destination $packageRoot
 Copy-Item scripts/test-resource-plan.ps1 -Destination $packageRoot
 $sourceArchive = Join-Path $packageRoot 'AmberL-source.zip'
-git archive --format=zip "--output=$sourceArchive" HEAD
+git -c core.autocrlf=false archive --format=zip "--output=$sourceArchive" HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot archive the exact source revision.' }
+# Git archive respects core.autocrlf. Check actual Git blob identities so a host
+# preference cannot silently change source bytes in the delivered snapshot.
+$expectedBlobs = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+git ls-tree -r '--format=%(objectname) %(path)' HEAD | ForEach-Object {
+    if ($_ -notmatch '^([0-9a-f]{40}) (.+)$') { throw 'Unexpected source tree entry' }
+    $expectedBlobs.Add($Matches[2], $Matches[1])
+}
+if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate source tree.' }
+$sourceZip = [IO.Compression.ZipFile]::OpenRead($sourceArchive)
+try {
+    $checkedBlobs = 0
+    foreach ($entry in $sourceZip.Entries | Where-Object { -not $_.FullName.EndsWith('/') }) {
+        if (-not $expectedBlobs.ContainsKey($entry.FullName)) { throw 'Unexpected source archive file' }
+        $stream = $entry.Open()
+        $memory = [IO.MemoryStream]::new()
+        try { $stream.CopyTo($memory); $bytes = $memory.ToArray() }
+        finally { $stream.Dispose(); $memory.Dispose() }
+        $header = [Text.Encoding]::UTF8.GetBytes(('blob ' + $bytes.Length + [char]0))
+        $blobHash = [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData([byte[]]($header + $bytes))).ToLowerInvariant()
+        if ($blobHash -ne $expectedBlobs[$entry.FullName]) { throw ('Source blob mismatch: ' + $entry.FullName) }
+        $checkedBlobs++
+    }
+    if ($checkedBlobs -ne $expectedBlobs.Count) { throw 'Source archive is incomplete' }
+} finally { $sourceZip.Dispose() }
 Set-Content -LiteralPath (Join-Path $packageRoot 'TEST-REVISION.txt') -Value $revision -Encoding utf8
 $metadata = cargo metadata --locked --offline --format-version 1 | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve exact dependency notices.' }

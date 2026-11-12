@@ -114,6 +114,11 @@ two-name/one-hash deduplication check.
 - No game resource materialization, archive extraction, login or actual launch has been
   added. Completing the batch means all planned resources were verified in app cache.
 
+Packaging now disables host `core.autocrlf` conversion for the source archive and checks
+every archived file against its Git blob SHA. The first resumed package check exposed
+CRLF-only differences caused by the host setting; the corrected package preserves exact
+committed source bytes. Existing prior packages are retained, not overwritten.
+
 ## Limits
 No Minecraft authentication, visible game/world, installation, content download UI, backup,
 recovery, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
