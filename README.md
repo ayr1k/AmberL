@@ -19,6 +19,8 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - CLI Java executable inspection with timeout, cancellation and bounded output.
 - Read-only Vanilla version/asset plans with platform rules, Java requirements,
   separate native archives, exact argument boundaries and conflicting-path rejection.
+- Batch Vanilla cache preparation: verified asset-index discovery, explicit byte budget,
+  cross-resource deduplication, cancellation and retries that reuse verified cache files.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
@@ -65,6 +67,18 @@ Inherited/loader metadata and custom entrypoints return errors instead of partia
 
 版本与资源索引可生成只读计划，保留 Java 要求、平台规则和资源映射；
 未知 Java 要求保持未知。计划成功不代表完成下载、安装或游戏启动。
+
+To populate only the app cache, run
+`amberl-inspect prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes>`.
+Use metadata from a trusted provider and choose the maximum unique resource bytes explicitly.
+The budget includes cache hits; discovering the complete plan may require downloading the
+asset index first. Failures retain completed cache objects for a verified retry. The task is
+sequential, and success means cached resources, not an installed or launchable game.
+`test-resource-plan.ps1` tests the packaged CLI with tiny synthetic metadata and seeded
+cache files without a network request. Live HTTPS has a separate test script and remains blocked.
+
+新增批量缓存准备：先校验索引，再检查总量上限，支持去重、取消与失败后重试。
+只写 AmberL 缓存，不安装或修改游戏；测试使用合成数据，不等同于联网验收。
 
 ## Build / 构建
 

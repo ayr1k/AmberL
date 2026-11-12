@@ -29,6 +29,8 @@
 - `amberl-inspect`: independent CLI for reproducible inspection.
 - `ambrum::manifest` (currently Windows): pure Vanilla/resource plans with ordered
   platform/feature rules and bounded regexes. No authentication, network, writes or execution.
+- `ambrum::prepare` (Windows): two-phase Vanilla cache preparation, index first then
+  unique resources; explicit byte budget, cancellation and reusable verified cache objects.
 - `amberl-native-probe`: Win32 standard controls, virtual list, background worker.
 
 Unregistered inspection uses canonical path + profile name. Registered scans use a GUID
@@ -64,6 +66,16 @@ Maven-only descriptors, unsupported extraction/logging rules and conflicting des
 Assets are deduplicated by hash with an ordered map; up to 100,000 logical objects are
 accepted. Plans are not mutation authority or authenticated metadata. Installation must
 independently validate resource ownership, archives and actual file state before committing.
+
+Batch preparation checks known metadata against the byte budget before requesting its
+asset index. The index is fetched and then reread with a fresh digest check using a file
+handle that denies concurrent writes/deletion; reads reject links and exceedance of 8 MiB.
+Asset discovery has no claimed total/percentage. Once it succeeds, the entire unique
+resource plan must fit the caller's byte budget (cache hits included; at most 105,000 files).
+Only committed resources contribute to the completed count. Cancellation/failure does not
+report batch completion and retains already verified files for the next explicit retry.
+Preparation is sequential, with no automatic retries or partial-stream resume. This does
+not provide a permanent immutable cache snapshot or authorization to install game files.
 
 ## UI decision remains open
 Compare Slint and WinUI 3 on the same actual scan/list/input/task/log data. egui is an

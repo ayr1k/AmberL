@@ -98,6 +98,22 @@ two-name/one-hash deduplication check.
   available, the upload must parent remote main, preserve local history, record the
   local/API commit mapping, and verify remote files and a Draft PR without force-pushing.
 
+## Continued milestone: batch cache preparation (2026-11-12)
+- Eight targeted preparation tests passed with injected streams and actual Windows
+  cache/hash operations: index-first discovery and deduplication; verified cache reuse;
+  interrupted batch recovery; cancellation before request/after index; preflight and
+  discovered-asset budget rejection; corrupted-index detection/recovery; linked metadata
+  and game-root rejection; active-writer/non-JSON metadata rejection. All eight existing
+  download tests passed after the cache API change.
+- Strict Clippy and release build passed. The CLI shares Ctrl+C cancellation handling
+  between single-resource fetching and batch preparation; actual interactive Ctrl+C
+  latency is still unverified. Remote CI remains unexecuted because upload is blocked.
+- The packaged CLI smoke script uses three seeded cache files totaling 87 bytes and
+  synthetic metadata. It verifies planning, cache preparation, budget rejection and input
+  preservation. This is intentionally separate from the unsuccessful live HTTPS check.
+- No game resource materialization, archive extraction, login or actual launch has been
+  added. Completing the batch means all planned resources were verified in app cache.
+
 ## Limits
 No Minecraft authentication, visible game/world, installation, content download UI, backup,
 recovery, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.

@@ -14,7 +14,9 @@ fn main() {
         [command, metadata, os_version] if command == "plan-vanilla" => plan(Path::new(metadata), os_version.to_str()),
         #[cfg(windows)]
         [command, index] if command == "plan-assets" => plan_assets(Path::new(index)),
-        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
+        #[cfg(windows)]
+        [command, directory, metadata, os_version, max_bytes] if command == "prepare-vanilla" => prepare(Path::new(directory), Path::new(metadata), os_version.to_str(), max_bytes.to_str()),
+        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json> | prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
     };
     match result {
         Ok(output) => println!("{output}"),
@@ -46,13 +48,7 @@ fn plan(path: &Path, os_version: Option<&str>) -> ambrum::Result<String> {
 }
 
 #[cfg(windows)]
-fn fetch(
-    directory: &Path,
-    url: Option<&str>,
-    checksum: Option<&str>,
-    size: Option<&str>,
-) -> ambrum::Result<String> {
-    use ambrum::download::{Algorithm, Artifact, Cache, Https};
+fn cancellable<T>(run: impl FnOnce(&Cancellation) -> ambrum::Result<T>) -> ambrum::Result<T> {
     use windows_sys::Win32::System::Console::*;
     static CANCEL: std::sync::OnceLock<Cancellation> = std::sync::OnceLock::new();
     unsafe extern "system" fn interrupt(event: u32) -> i32 {
@@ -65,6 +61,60 @@ fn fetch(
             0
         }
     }
+    let token = CANCEL.get_or_init(Cancellation::default);
+    if unsafe { SetConsoleCtrlHandler(Some(interrupt), 1) } == 0 {
+        return Err("Cannot register cancellation handler".into());
+    }
+    let result = run(token);
+    unsafe {
+        SetConsoleCtrlHandler(Some(interrupt), 0);
+    }
+    result
+}
+
+#[cfg(windows)]
+fn prepare(
+    directory: &Path,
+    metadata: &Path,
+    os_version: Option<&str>,
+    max_bytes: Option<&str>,
+) -> ambrum::Result<String> {
+    let path = ambrum::paths::ordinary(metadata)?;
+    let value = ambrum::paths::json(path.parent().ok_or("Missing metadata parent")?, &path)?;
+    let platform =
+        ambrum::manifest::Platform::windows_x64(os_version.ok_or("Invalid Windows version")?);
+    let budget = max_bytes
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|n| *n > 0)
+        .ok_or("Explicit positive byte budget required")?;
+    let prepared = cancellable(|cancel| {
+        ambrum::prepare::vanilla(
+            &ambrum::download::Cache::open(directory)?,
+            &value,
+            &platform,
+            budget,
+            &ambrum::download::Https,
+            cancel,
+            |p| {
+                // Discovery has no known total. Completion only means verified cache resources.
+                eprintln!(
+                    "{:?}: {} / {:?} cache resources",
+                    p.phase, p.verified_files, p.total_files
+                );
+            },
+        )
+    })?;
+    serde_json::to_string_pretty(&prepared).map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn fetch(
+    directory: &Path,
+    url: Option<&str>,
+    checksum: Option<&str>,
+    size: Option<&str>,
+) -> ambrum::Result<String> {
+    use ambrum::download::{Algorithm, Artifact, Cache, Https};
     let (algorithm, digest) = checksum
         .and_then(|s| s.split_once(':'))
         .ok_or("Expected sha1:hex or sha256:hex")?;
@@ -80,19 +130,14 @@ fn fetch(
             .and_then(|s| s.parse().ok())
             .ok_or("Invalid byte count")?,
     };
-    let token = CANCEL.get_or_init(Cancellation::default);
-    let handler = unsafe { SetConsoleCtrlHandler(Some(interrupt), 1) } != 0;
-    let result = Cache::open(directory).and_then(|cache| {
-        cache.fetch(&artifact, &Https, token, |p| {
-            // No URL/headers/tokens in progress or diagnostics.
-            eprintln!("{:?}: {}/{}", p.phase, p.received, p.total);
+    let result = cancellable(|token| {
+        Cache::open(directory).and_then(|cache| {
+            cache.fetch(&artifact, &Https, token, |p| {
+                // No URL/headers/tokens in progress or diagnostics.
+                eprintln!("{:?}: {}/{}", p.phase, p.received, p.total);
+            })
         })
     });
-    if handler {
-        unsafe {
-            SetConsoleCtrlHandler(Some(interrupt), 0);
-        }
-    }
     serde_json::to_string_pretty(&result?).map_err(|e| e.to_string())
 }
 

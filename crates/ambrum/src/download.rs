@@ -53,7 +53,7 @@ impl Artifact {
     pub fn validate(&self) -> Result<()> {
         self.key().map(|_| ())
     }
-    fn key(&self) -> Result<String> {
+    pub(crate) fn key(&self) -> Result<String> {
         Https::validate(&self.url)?;
         if self.size > 16 * 1024 * 1024 * 1024
             || self.digest.len() != self.algorithm.bytes() * 2
@@ -98,6 +98,59 @@ pub struct Cache {
     directory: DirectoryGuard,
 }
 impl Cache {
+    /// Read a small cached metadata object with a fresh digest check while denying
+    /// concurrent writes/deletion. A path returned by fetch is not a trusted snapshot.
+    pub fn read_json(
+        &self,
+        artifact: &Artifact,
+        cancel: &Cancellation,
+    ) -> Result<serde_json::Value> {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+        cancel.check()?;
+        let key = artifact.key()?;
+        if artifact.size > 8 * 1024 * 1024 {
+            return Err("Cached metadata exceeds 8 MiB".into());
+        }
+        let mut file = options()
+            .share_mode(FILE_SHARE_READ)
+            .open(self.directory.root.join(key))
+            .map_err(|_| "Cached metadata unavailable or busy")?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| "Cannot inspect cached metadata")?;
+        if info(&file)?.nNumberOfLinks != 1
+            || !metadata.is_file()
+            || metadata.len() != artifact.size
+        {
+            return Err("Cached metadata size/type mismatch".into());
+        }
+        let mut bytes = Vec::with_capacity(artifact.size as usize);
+        let mut hash = Hash::new(artifact.algorithm)?;
+        let mut buffer = [0; 64 * 1024];
+        loop {
+            cancel.check()?;
+            let count = file
+                .read(&mut buffer)
+                .map_err(|_| "Cannot read cached metadata")?;
+            if count == 0 {
+                break;
+            }
+            if bytes.len() as u64 + count as u64 > artifact.size {
+                return Err("Cached metadata grew during read".into());
+            }
+            hash.update(&buffer[..count])?;
+            bytes.extend_from_slice(&buffer[..count]);
+        }
+        cancel.check()?;
+        if bytes.len() as u64 != artifact.size
+            || !hash.finish()?.eq_ignore_ascii_case(&artifact.digest)
+        {
+            return Err("Cached metadata checksum mismatch".into());
+        }
+        serde_json::from_slice(&bytes).map_err(|_| "Cached metadata is not valid JSON".into())
+    }
+
     pub fn open(app_directory: &Path) -> Result<Self> {
         let app = DirectoryGuard::open(app_directory)?;
         if app.root.join("versions").exists() || app.root.join("instances").exists() {

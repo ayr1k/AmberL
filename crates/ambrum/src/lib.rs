@@ -8,6 +8,8 @@ pub mod library;
 pub mod manifest;
 pub mod paths;
 #[cfg(windows)]
+pub mod prepare;
+#[cfg(windows)]
 pub mod registry;
 pub mod task;
 

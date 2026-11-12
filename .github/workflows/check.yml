@@ -20,6 +20,8 @@ jobs:
       - shell: pwsh
         run: ./scripts/test-native-probe.ps1
       - shell: pwsh
+        run: ./scripts/test-resource-plan.ps1
+      - shell: pwsh
         run: ./scripts/package-probe.ps1
       - uses: actions/upload-artifact@v4
         with:
