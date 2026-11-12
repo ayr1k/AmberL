@@ -52,3 +52,6 @@ if ((Get-FileHash -LiteralPath $metadataPath -Algorithm SHA256).Hash -ne $before
     verified_files=3;verified_bytes=87;cache_hits=3;budget_rejection=$true;input_unchanged=$true
     scope='Synthetic metadata and seeded cache; not live HTTPS, game installation or launch'
 } | ConvertTo-Json
+# The deliberately rejected budget command exits 1; do not leak that expected
+# failure as the smoke script's status (including the GitHub Actions pwsh wrapper).
+exit 0
