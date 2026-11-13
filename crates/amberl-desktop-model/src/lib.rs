@@ -20,6 +20,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+pub mod network;
 
 #[derive(Clone, Debug)]
 pub struct Game {
@@ -41,6 +42,7 @@ pub struct LaunchChoice {
     pub account_id: String,
     pub memory_mib: u32,
     pub os_version: String,
+    pub target: Option<ambrum::multiplayer::Address>,
 }
 impl LaunchChoice {
     pub fn capture(game: &Game, java: &str, account: &str, memory: i32, os: &str) -> Result<Self> {
@@ -62,6 +64,7 @@ impl LaunchChoice {
             account_id: account.into(),
             memory_mib: memory as u32,
             os_version: os.into(),
+            target: None,
         })
     }
 }
@@ -117,12 +120,17 @@ pub struct Model {
     pub data_revision: u64,
     pub java_revision: u64,
     pub running: bool,
+    pub network: network::Network,
+    pub preferences: std::collections::BTreeMap<String, ambrum::preferences::Launch>,
     worker: Option<Worker>,
     log: VecDeque<String>,
 }
 impl Model {
     pub fn new(app: PathBuf) -> Self {
+        let saved = ambrum::preferences::load(&app);
+        let (selected, preferences) = saved.as_ref().cloned().unwrap_or_default();
         Self {
+            network: network::Network::new(app.clone()),
             app,
             games: vec![],
             accounts: vec![],
@@ -131,8 +139,9 @@ impl Model {
             loaders: vec![],
             loader_key: (String::new(), String::new()),
             catalog_revision: 0,
-            selected: None,
-            status: "选择或安装一个游戏".into(),
+            selected,
+            preferences,
+            status: saved.err().unwrap_or_else(|| "选择或安装一个游戏".into()),
             device_prompt: String::new(),
             revision: 1,
             data_revision: 1,
@@ -144,6 +153,20 @@ impl Model {
     }
     pub fn busy(&self) -> bool {
         self.worker.is_some()
+    }
+    pub fn save_preferences(&mut self, preference: ambrum::preferences::Launch) -> Result<()> {
+        let id = self.selected_game().ok_or("请先选择游戏")?.id.clone();
+        if preference
+            .account
+            .as_ref()
+            .is_some_and(|id| !self.accounts.iter().any(|a| &a.id == id))
+        {
+            return Err("账户选择已失效".into());
+        }
+        ambrum::preferences::save(&self.app, &id, preference.clone())?;
+        self.preferences.insert(id, preference);
+        self.report("已保存此游戏的启动配置".into());
+        Ok(())
     }
     pub fn selected_game(&self) -> Option<&Game> {
         self.games
@@ -298,6 +321,11 @@ impl Model {
         Ok(())
     }
     pub fn tick(&mut self) {
+        let previous = self.network.revision;
+        self.network.tick();
+        if previous != self.network.revision {
+            self.revision += 1;
+        }
         let mut finished = false;
         for _ in 0..32 {
             let Some(worker) = &self.worker else { break };
@@ -547,7 +575,7 @@ fn execute(
                 max_memory_mib: choice.memory_mib,
                 os_version: &choice.os_version,
             };
-            let exit = launch::run(&selection, cancel, |event| {
+            let exit = launch::run_join(&selection, choice.target.as_ref(), cancel, |event| {
                 let status = match event {
                     launch::Event::CheckingResources => "正在核验游戏文件…".into(),
                     launch::Event::Authenticating => "正在刷新并验证微软账户…".into(),

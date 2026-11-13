@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-import { Button, LineEdit, ComboBox, SpinBox, ListView, TextEdit, AboutSlint, Palette } from "std-widgets.slint";
+import { Button, LineEdit, ComboBox, SpinBox, ListView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
 
 
 export struct GameRow { id: string, title: string, subtitle: string, icon: string }
@@ -100,6 +100,20 @@ export component Launcher inherits Window {
     callback select-game(string); callback refresh(); callback add-library(); callback install-game();
     callback login(); callback logout(); callback open-microsoft(); callback discover-java();
     callback choose-account(int); callback choose-java(int); callback launch(); callback cancel(); callback open-folder();
+    callback save-config(); callback open-eula(); callback launch-join();
+    in-out property <int> network-tab: 0;
+    in property <[string]> server-options; in-out property <int> server-index: -1;
+    in property <[string]> server-versions; in-out property <int> server-version-index: -1;
+    in property <bool> network-busy; in property <bool> server-active; in property <bool> room-active; in property <bool> component-ready;
+    in property <string> network-status; in property <string> server-status; in property <string> room-status; in property <string> query-status;
+    in property <string> server-log; in property <string> room-invite; in property <string> room-address;
+    in-out property <string> server-name: "好友的世界"; in-out property <int> server-port: 25565; in-out property <int> server-memory: 2048; in-out property <bool> server-eula: false;
+    in-out property <string> console-command;
+    in-out property <int> host-port: 25565; in-out property <int> guest-port: 25567;
+    in-out property <string> room-peer: "tcp://public.easytier.top:11010";
+    in-out property <string> invite-input; in-out property <string> join-target;
+    callback refresh-servers(); callback create-server(); callback choose-server(int); callback start-server(); callback stop-server(); callback server-command();
+    callback install-network(); callback host-room(); callback join-room(); callback leave-room(); callback probe-server();
 
     // Explicit origins prevent Slint's automatic child centering from shifting the scene.
     Image { x: 0px; y: 0px; width: root.width; height: root.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
@@ -166,8 +180,8 @@ export component Launcher inherits Window {
     if root.panel != 0: Rectangle {
         x: 0px; y: 0px; width: root.width; height: root.height; background: #07151b64;
         TouchArea { }
-        Glass { x: (parent.width - self.width)/2; y: (parent.height - self.height)/2; width: min(720px,parent.width - 80px);
-            height: min(root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 || root.panel == 6 ? 360px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 562px : 640px, parent.height - 100px);
+        Glass { x: (parent.width - self.width)/2; y: root.panel == 6 ? max(80px,(parent.height - self.height)/2) : (parent.height - self.height)/2; width: min(root.panel == 6 ? 900px : 720px,parent.width - 80px);
+            height: min(root.panel == 6 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 ? 140px : 100px));
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: #10232dde;
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
@@ -190,13 +204,14 @@ export component Launcher inherits Window {
                 }
                 if root.panel == 2: VerticalLayout {
                     spacing: 14px;
-                    Text { vertical-stretch: 0; text: "明确选择 Java 与内存；本轮选择在当前会话有效。"; color: #becacb; wrap: word-wrap; }
+                    Text { vertical-stretch: 0; text: "为当前游戏保存 Java、账户选择和内存，重新打开后恢复。"; color: #becacb; wrap: word-wrap; }
                     Button { text: "查找本机 Java"; enabled: !root.busy; clicked => { root.discover-java(); } }
                     ComboBox { model: root.java-options; current-index <=> root.java-index; enabled: !root.busy; selected(value) => { root.choose-java(self.current-index); } }
                     Text { vertical-stretch: 0; text: "Java 可执行文件（java.exe）"; color: #d9e2e0; }
                     LineEdit { height: 40px; text <=> root.java-path; enabled: !root.busy; accessible-label: "Java 可执行文件"; }
                     HorizontalLayout { spacing: 16px; height: 40px; Text { vertical-stretch: 0; vertical-alignment: center; text: "最大内存（MiB）"; color: #d9e2e0; } SpinBox { value <=> root.memory-mib; minimum: 512; maximum: 65536; enabled: !root.busy; } }
                     Button { text: "打开所选游戏目录"; enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
+                    Button { text: "保存当前游戏配置"; enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
                     Text { vertical-stretch: 0; text: "只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"; color: #aab8ba; wrap: word-wrap; }
                 }
                 if root.panel == 3: VerticalLayout {
@@ -288,13 +303,106 @@ export component Launcher inherits Window {
                     TextEdit { text: root.task-log; read-only: true; accessible-label: "任务记录"; height: min(320px,root.height - 400px); }
                     Text { vertical-stretch: 0; text: "启动进程不等于已进入世界。取消运行中的游戏会请求正常退出，并等待游戏结束。"; color: #becacb; wrap: word-wrap; }
                 }
-                if root.panel == 6: Text { vertical-stretch: 0; text: "联机工作区仍在开发\n\n服务端管理、FRP 与加入房间将在后续阶段接入。当前不报告连接或在线状态。"; color: #becacb; wrap: word-wrap; }
+                if root.panel == 6: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    HorizontalLayout { height: 40px; spacing: 8px;
+                        Action { label: "服务端"; selected: root.network-tab == 0; clicked => { root.network-tab=0; } }
+                        Action { label: "创建服务端"; selected: root.network-tab == 1; clicked => { root.network-tab=1; if root.server-versions.length == 0 && !root.busy { root.load-versions(); } } }
+                        Action { label: "邀请房间"; selected: root.network-tab == 2; clicked => { root.network-tab=2; } }
+                        Action { label: "加入游戏"; selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
+                        Action { label: "控制台"; selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
+                    }
+                    if root.network-tab == 0: VerticalLayout { spacing: 16px;
+                        Text { vertical-stretch: 0; text: "我的独立服务端"; color: #d9e2e0; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { model: root.server-options; current-index <=> root.server-index; enabled: !root.server-active && !root.network-busy; selected(value) => { root.choose-server(self.current-index); } }
+                            Action { width: 96px; label: "刷新"; enabled: !root.network-busy; clicked => { root.refresh-servers(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.server-status; color: #9ae3cc; wrap: word-wrap; }
+                        HorizontalLayout { height: 40px; spacing: 16px;
+                            Text { vertical-stretch: 0; text: "服务端内存（MiB）"; color: #d9e2e0; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-memory; minimum: 512; maximum: 65536; enabled: !root.server-active; }
+                            Action { width: 160px; label: "选择 Java"; clicked => { root.panel=2; } }
+                        }
+                        Text { vertical-stretch: 0; text: root.java-path == "" ? "请先选择兼容的 java.exe" : root.java-path; color: #becacb; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: "启动服务端"; selected: true; enabled: !root.network-busy && !root.server-active && root.server-index >= 0 && root.java-path != ""; clicked => { root.start-server(); } }
+                            Action { label: "保存并停止"; enabled: root.server-active; clicked => { root.stop-server(); } }
+                        }
+                        Text { vertical-stretch: 0; text: "服务端与游戏可同时运行。当前创建原版服务端，只监听本机，启用正版验证；使用邀请房间与朋友连接。"; color: #becacb; wrap: word-wrap; font-size: 14px; }
+                    }
+                    if root.network-tab == 1: VerticalLayout { spacing: 12px;
+                        Text { vertical-stretch: 0; text: "游戏版本 · 官方原版服务端"; color: #d9e2e0; font-size: 13px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { model: root.server-versions; current-index <=> root.server-version-index; enabled: !root.network-busy; }
+                            Action { width: 96px; label: "更新列表"; enabled: !root.busy; clicked => { root.load-versions(); } }
+                        }
+                        Text { vertical-stretch: 0; text: "名称与监听端口"; color: #d9e2e0; font-size: 13px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.server-name; accessible-label: "服务端名称"; enabled: !root.network-busy; }
+                            SpinBox { width: 160px; value <=> root.server-port; minimum: 1024; maximum: 65535; enabled: !root.network-busy; }
+                        }
+                        Text { vertical-stretch: 0; text: "存档保存在 AmberL 独立应用目录中。只新建服务端，不导入或覆盖现有世界。"; color: #becacb; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            CheckBox { text: "我已阅读并同意 Minecraft EULA"; checked <=> root.server-eula; enabled: !root.network-busy; }
+                            Action { width: 100px; label: "阅读 EULA"; flat: true; clicked => { root.open-eula(); } }
+                        }
+                        Action { label: "下载并创建服务端"; selected: true; enabled: !root.network-busy && root.server-eula && root.server-version-index >= 0 && root.server-name != ""; clicked => { root.create-server(); } }
+                    }
+                    if root.network-tab == 2: VerticalLayout { spacing: 12px;
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: root.component-ready ? "EasyTier 2.6.4 · 运行前校验" : "下载联机组件后即可创建和加入房间"; color: #becacb; vertical-alignment: center; font-size: 14px; }
+                            Action { width: 132px; label: "下载联机组件"; enabled: !root.network-busy && !root.room-active; clicked => { root.install-network(); } }
+                        }
+                        Text { vertical-stretch: 0; text: "连接节点（可修改为自己的 EasyTier 节点）"; color: #d9e2e0; font-size: 13px; }
+                        LineEdit { height: 40px; text <=> root.room-peer; enabled: !root.room-active; accessible-label: "EasyTier 连接节点"; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: "共享本机 Minecraft 端口"; color: #d9e2e0; vertical-alignment: center; font-size: 14px; }
+                            SpinBox { width: 140px; value <=> root.host-port; minimum: 1024; maximum: 65535; enabled: !root.room-active; }
+                            Action { label: "创建邀请"; enabled: root.component-ready && !root.room-active && !root.network-busy; clicked => { root.host-room(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.room-status; color: #9ae3cc; wrap: word-wrap; font-size: 14px; }
+                        TextEdit { height: 72px; text: root.room-invite; read-only: true; accessible-label: "房间邀请，选择并复制给朋友"; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: "邀请含加入密钥，24 小时有效，仅发给信任的朋友。关闭房间立即断开转发。"; color: #becacb; wrap: word-wrap; font-size: 13px; }
+                            Action { width: 128px; label: "关闭房间"; enabled: root.room-active; clicked => { root.leave-room(); } }
+                        }
+                    }
+                    if root.network-tab == 3: VerticalLayout { spacing: 10px;
+                        Text { vertical-stretch: 0; text: "粘贴 AmberL 邀请 · 需先在邀请房间页下载联机组件"; color: #d9e2e0; font-size: 13px; }
+                        LineEdit { height: 40px; text <=> root.invite-input; enabled: !root.room-active; accessible-label: "房间邀请码"; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: "本地端口"; color: #d9e2e0; vertical-alignment: center; font-size: 14px; }
+                            SpinBox { width: 140px; value <=> root.guest-port; minimum: 1024; maximum: 65535; enabled: !root.room-active; }
+                            Action { label: "连接房间"; enabled: root.component-ready && !root.room-active && !root.network-busy && root.invite-input != ""; clicked => { root.join-room(); } }
+                            Action { label: "离开"; enabled: root.room-active; clicked => { root.leave-room(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.room-status; color: #9ae3cc; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.join-target; placeholder-text: "服务器地址或房间本地地址"; accessible-label: "加入游戏地址"; }
+                            Action { width: 128px; label: "填入房间地址"; enabled: root.room-address != ""; clicked => { root.join-target=root.room-address; } }
+                        }
+                        Text { vertical-stretch: 0; text: root.query-status; color: #becacb; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: "查询游戏状态"; enabled: root.join-target != ""; clicked => { root.probe-server(); } }
+                            Action { label: "启动所选游戏并加入"; selected: true; enabled: !root.busy && root.launch-candidate && root.account-index > 0 && root.java-path != "" && root.join-target != ""; clicked => { root.launch-join(); } }
+                        }
+                        Text { vertical-stretch: 0; text: "使用游戏页所选版本、账户和启动配置。请与房主保持版本和模组一致；状态响应不代表已登录或进入世界。"; color: #aabdbf; wrap: word-wrap; font-size: 13px; }
+                    }
+                    if root.network-tab == 4: VerticalLayout { spacing: 12px;
+                        Text { vertical-stretch: 0; text: root.server-status; color: #9ae3cc; font-size: 14px; wrap: word-wrap; }
+                        TextEdit { height: min(260px,root.height - 430px); text: root.server-log; read-only: true; accessible-label: "服务端控制台输出"; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.console-command; enabled: root.server-active; placeholder-text: "输入单行服务端命令，例如 list"; accessible-label: "服务端命令"; }
+                            Action { width: 96px; label: "发送"; enabled: root.server-active && root.console-command != ""; clicked => { root.server-command(); } }
+                        }
+                    }
+                }
                 if root.panel == 7: VerticalLayout {
                     Text { vertical-stretch: 0; text: "AmberL · 原生桌面开发预览\nAmbrum Rust 核心 / MPL-2.0\n沿用 AMBER 图形标志，青绿色为 AmberL 识别色。\nSlint 为当前界面实现，最终框架验收尚未完成。"; color: #becacb; wrap: word-wrap; }
                     AboutSlint {}
                 }
                 Rectangle { vertical-stretch: 1; }
-                Text { vertical-stretch: 0; text: root.status; color: #c7d5d3; wrap: word-wrap; }
+                Text { vertical-stretch: 0; text: root.panel == 6 ? root.network-status : root.status; color: #c7d5d3; wrap: word-wrap; }
                 if root.busy: Button { text: root.running ? "请求游戏正常退出" : "取消当前操作"; clicked => { root.cancel(); } }
             }
         }

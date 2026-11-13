@@ -24,7 +24,8 @@ process, service or per-frame CPU convolution is used. System fonts are not bund
    device login and complete it yourself on the Microsoft official page. Passwords
    are never entered into AmberL. Accounts use its independent current-user DPAPI store.
 3. Open Java/configuration, find local candidates and explicitly choose one, or enter
-   the executable path. Set the maximum heap. Choices currently last for this session.
+   the executable path. Set the maximum heap. Per-game choices persist when saved,
+   launched or switched; account IDs are references to the independent protected store.
 4. Select a game. Only an AmberL-created complete installation can proceed to launch;
    the marker shown in the list is a hint, not authorization or readiness evidence.
    Core launch rechecks identity, receipts, resource hashes, Java and account ownership.
@@ -42,10 +43,16 @@ process, service or per-frame CPU convolution is used. System fonts are not bund
 Stage B remains a preview. Slint carries the chosen visual implementation while
 IME composition, Narrator/high contrast, multi-monitor DPI transitions and clean-machine
 deployment remain acceptance gates. Read-only library parsing is broader than launch
-compatibility. Multiplayer, runtime downloading, persisted per-game launch settings,
+compatibility. Complete multiplayer acceptance, runtime downloading,
 installer/updater delivery and a force-exit policy remain future work. Process creation
 does not establish world readiness. A windowless/unresponsive game can keep cancellation
 waiting; there is no bulk Java termination. No stable release or merge is authorized.
+
+The **联机** panel now includes Vanilla server creation/start/graceful stop, console,
+EasyTier invitation rooms, status queries and joining a compatible selected game.
+See [multiplayer instructions and limits](MULTIPLAYER.md). A local two-peer smoke test
+is not two-computer or public-relay acceptance. Server Java/memory choices remain
+session-scoped; game launch preferences persist independently per game.
 
 See `design-qa.md` for this visual iteration and PR #1 for the exact tested revision,
 package checksums and current real-game verification; earlier CLI acceptance is kept

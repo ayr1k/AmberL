@@ -62,3 +62,16 @@ SVG theme tint is applied only by the native renderer. No Minecraft textures are
 Official Minecraft and loader binaries are downloaded for the user's selected instance,
 not included in source or test ZIPs. Forge/NeoForge installers execute only when that
 component is explicitly selected and are not redistributed with AmberL.
+
+Multiplayer downloads EasyTier 2.6.4 only on explicit request from the official
+[Windows x64 release](https://github.com/EasyTier/EasyTier/releases/tag/v2.6.4).
+The upstream project is Apache-2.0; its source and license are available at
+[the pinned source tag](https://github.com/EasyTier/EasyTier/tree/v2.6.4).
+Neither EasyTier nor its required upstream Packet.dll/wintun.dll are bundled in
+AmberL source/test ZIPs. The original provider archive remains in the verified
+download cache. No virtual adapter/driver installer is run by AmberL.
+The package is `easytier-windows-x86_64-v2.6.4.zip` (32,657,720 bytes), SHA-256
+`27af91e270e554709b048bd32327fefd2dfce5062ae1e8701af7550c6f525f84`.
+Executable/DLL pins are recorded in `crates/ambrum/src/multiplayer/room.rs` and
+rechecked before each owned room process. Minecraft servers are downloaded from
+official metadata after EULA acceptance, never redistributed in the preview ZIP.

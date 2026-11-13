@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 #![cfg_attr(windows, windows_subsystem = "windows")]
 use amberl_desktop_model::{LaunchChoice, Model};
+use slint::Model as _;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
@@ -15,6 +16,8 @@ struct View {
     java_revision: u64,
     catalog_revision: u64,
     account: Option<String>,
+    selected: Option<String>,
+    network_revision: u64,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
@@ -45,8 +48,48 @@ fn filter_versions(ui: &Launcher, model: &Model) {
     )));
 }
 fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
-    if view.revision == model.revision {
+    if view.revision == model.revision && view.network_revision == model.network.revision {
         return;
+    }
+    if view.selected != model.selected && model.selected_game().is_some() {
+        if let Some(p) = model
+            .selected
+            .as_ref()
+            .and_then(|id| model.preferences.get(id))
+        {
+            ui.set_java_path(p.java.to_string_lossy().as_ref().into());
+            ui.set_memory_mib(p.memory_mib as i32);
+            view.account = p.account.clone();
+        }
+        view.selected = model.selected.clone();
+        view.data_revision = 0;
+    }
+    if view.network_revision != model.network.revision {
+        let n = &model.network;
+        ui.set_server_options(strings(
+            n.servers
+                .iter()
+                .map(|s| format!("{} · {} · :{} · {}", s.name, s.version, s.port, &s.id[..6]))
+                .collect(),
+        ));
+        ui.set_server_index(
+            n.selected
+                .as_ref()
+                .and_then(|id| n.servers.iter().position(|s| &s.id == id))
+                .map_or(-1, |i| i as i32),
+        );
+        ui.set_server_active(n.server_active());
+        ui.set_room_active(n.room_active());
+        ui.set_network_busy(n.busy());
+        ui.set_network_status(n.status.as_str().into());
+        ui.set_server_status(n.server_status.as_str().into());
+        ui.set_room_status(n.room_status.as_str().into());
+        ui.set_query_status(n.query_status.as_str().into());
+        ui.set_server_log(n.log().into());
+        ui.set_room_invite(n.invite.as_str().into());
+        ui.set_component_ready(n.component);
+        ui.set_room_address(n.join_address.as_str().into());
+        view.network_revision = n.revision;
     }
     if view.data_revision != model.data_revision {
         ui.set_games(ModelRc::new(VecModel::from(
@@ -97,6 +140,15 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     }
     if view.catalog_revision != model.catalog_revision {
         filter_versions(ui, model);
+        ui.set_server_versions(strings(
+            model
+                .catalog
+                .iter()
+                .filter(|v| v.kind == "release")
+                .map(|v| v.id.clone())
+                .collect(),
+        ));
+        ui.set_server_version_index(-1);
         if model.loader_key
             == (
                 ui.get_install_version().to_string(),
@@ -129,6 +181,107 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     ui.set_task_log(model.log().into());
     ui.set_device_prompt(model.device_prompt.as_str().into());
     view.revision = model.revision;
+}
+fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<()> {
+    model.save_preferences(ambrum::preferences::Launch {
+        java: ui.get_java_path().as_str().into(),
+        account: view.account.clone(),
+        memory_mib: u32::try_from(ui.get_memory_mib()).map_err(|_| "无效内存")?,
+    })
+}
+fn net(
+    model: &Rc<RefCell<Model>>,
+    f: impl FnOnce(&mut amberl_desktop_model::network::Network) -> ambrum::Result<()>,
+) {
+    let mut m = model.borrow_mut();
+    if let Err(error) = f(&mut m.network) {
+        m.network.report(error);
+    }
+}
+fn network_callbacks(ui: &Launcher, model: &Rc<RefCell<Model>>) {
+    macro_rules! action {
+        ($name:ident,$f:expr) => {{
+            let model = model.clone();
+            let weak = ui.as_weak();
+            ui.$name(move || {
+                if let Some(ui) = weak.upgrade() {
+                    net(&model, |n| ($f)(&ui, n));
+                }
+            });
+        }};
+    }
+    action!(
+        on_refresh_servers,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.reload()
+    );
+    action!(
+        on_install_network,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.install_component()
+    );
+    action!(
+        on_create_server,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            let version = u
+                .get_server_versions()
+                .row_data(
+                    usize::try_from(u.get_server_version_index())
+                        .map_err(|_| "请选择服务端版本")?,
+                )
+                .ok_or("请选择服务端版本")?;
+            n.create(
+                u.get_server_name().to_string(),
+                version.to_string(),
+                u.get_server_port(),
+                u.get_server_eula(),
+            )
+        }
+    );
+    action!(
+        on_start_server,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
+            .start_server(u.get_java_path().as_str().into(), u.get_server_memory())
+    );
+    action!(
+        on_stop_server,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            n.stop_server();
+            Ok(())
+        }
+    );
+    action!(
+        on_server_command,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            n.command(u.get_console_command().to_string())?;
+            u.set_console_command("".into());
+            Ok(())
+        }
+    );
+    action!(
+        on_host_room,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
+            .host(u.get_host_port(), u.get_room_peer().to_string())
+    );
+    action!(
+        on_join_room,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
+            .join(u.get_invite_input().to_string(), u.get_guest_port())
+    );
+    action!(
+        on_leave_room,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            n.leave();
+            Ok(())
+        }
+    );
+    action!(
+        on_probe_server,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
+            .probe(u.get_join_target().to_string())
+    );
+    {
+        let model = model.clone();
+        ui.on_choose_server(move |i| net(&model, |n| n.select(i)));
+    }
 }
 fn operation(model: &Rc<RefCell<Model>>, f: impl FnOnce(&mut Model) -> ambrum::Result<()>) {
     let mut model = model.borrow_mut();
@@ -216,6 +369,44 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let model = Rc::new(RefCell::new(Model::new(app)));
     let view = Rc::new(RefCell::new(View::default()));
     let os = windows_version();
+    network_callbacks(&ui, &model);
+    {
+        let model = model.clone();
+        let view = view.clone();
+        let weak = ui.as_weak();
+        ui.on_save_config(move || {
+            if let Some(ui) = weak.upgrade() {
+                operation(&model, |m| save_choice(&ui, m, &view.borrow()));
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let view = view.clone();
+        let weak = ui.as_weak();
+        let os = os.clone();
+        ui.on_launch_join(move || {
+            if let Some(ui) = weak.upgrade() {
+                operation(&model, |m| {
+                    save_choice(&ui, m, &view.borrow())?;
+                    let mut choice = LaunchChoice::capture(
+                        m.selected_game().ok_or("请先返回游戏页选择游戏")?,
+                        &ui.get_java_path(),
+                        view.borrow().account.as_deref().unwrap_or(""),
+                        ui.get_memory_mib(),
+                        &os,
+                    )?;
+                    choice.target =
+                        Some(ambrum::multiplayer::Address::parse(&ui.get_join_target())?);
+                    m.launch(choice)
+                });
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        ui.on_open_eula(move || operation(&model, |_| open("https://aka.ms/MinecraftEULA")));
+    }
     {
         let model = model.clone();
         ui.on_load_versions(move || operation(&model, Model::catalog));
@@ -284,7 +475,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     {
         let model = model.clone();
-        ui.on_select_game(move |id| operation(&model, |m| m.select(&id)));
+        let weak = ui.as_weak();
+        let view = view.clone();
+        ui.on_select_game(move |id| {
+            if let Some(ui) = weak.upgrade() {
+                operation(&model, |m| {
+                    if m.selected_game().is_some() {
+                        save_choice(&ui, m, &view.borrow())?;
+                    }
+                    m.select(&id)
+                })
+            }
+        });
     }
     {
         let model = model.clone();
@@ -396,6 +598,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_launch(move || {
             if let Some(ui) = weak.upgrade() {
                 operation(&model, |m| {
+                    save_choice(&ui, m, &view.borrow())?;
                     let game = m.selected_game().ok_or("请先选择游戏")?;
                     let choice = LaunchChoice::capture(
                         game,
@@ -426,8 +629,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let model = model.clone();
         let weak = ui.as_weak();
         ui.window().on_close_requested(move || {
-            if model.borrow().busy() {
+            if model.borrow().busy() || model.borrow().network.active() {
                 model.borrow_mut().cancel();
+                model.borrow_mut().network.shutdown();
                 if let Some(ui) = weak.upgrade() {
                     ui.set_panel(5);
                 }
@@ -438,6 +642,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     operation(&model, Model::reload);
+    net(&model, |n| n.reload());
     refresh(&ui, &model.borrow(), &mut view.borrow_mut());
     let timer = slint::Timer::default();
     {

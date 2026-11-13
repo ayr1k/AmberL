@@ -248,6 +248,15 @@ fn arguments(
 pub fn run(
     selection: &Selection<'_>,
     cancel: &Cancellation,
+    notify: impl FnMut(Event),
+) -> Result<Exit> {
+    run_join(selection, None, cancel, notify)
+}
+
+pub fn run_join(
+    selection: &Selection<'_>,
+    target: Option<&crate::multiplayer::Address>,
+    cancel: &Cancellation,
     mut notify: impl FnMut(Event),
 ) -> Result<Exit> {
     notify(Event::CheckingResources);
@@ -263,7 +272,34 @@ pub fn run(
     notify(Event::Authenticating);
     let mut store = Store::open(selection.app_directory)?;
     let identity = store.authenticate(selection.account_id, &crate::auth::http::Https, cancel)?;
-    let args = arguments(&prepared, &identity, &natives)?;
+    let mut args = arguments(&prepared, &identity, &natives)?;
+    if let Some(target) = target {
+        let target = crate::multiplayer::Address::parse(&target.text())?;
+        let supported = prepared.metadata["arguments"]["game"]
+            .as_array()
+            .is_some_and(|items| {
+                items.iter().any(|v| {
+                    v["value"].as_array().is_some_and(|a| {
+                        a.iter()
+                            .any(|s| s.as_str() == Some("--quickPlayMultiplayer"))
+                    })
+                })
+            });
+        if !supported {
+            return Err("此版本不支持快捷加入；请普通启动后在游戏的多人模式输入服务器地址".into());
+        }
+        args.extend(["--quickPlayMultiplayer".into(), target.text()]);
+        if args
+            .iter()
+            .map(|a| a.encode_utf16().count() * 2 + 3)
+            .sum::<usize>()
+            + prepared.report.java_executable.as_os_str().len() * 2
+            + 4
+            >= 32767
+        {
+            return Err("Launch command exceeds the Windows argument budget".into());
+        }
+    }
     cancel.check()?;
     let mut command = Command::new(&prepared.report.java_executable);
     command

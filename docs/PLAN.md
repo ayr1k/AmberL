@@ -7,6 +7,8 @@ on the same machine, cloned libraries, accounts, network and cache conditions be
 making any superiority claims. Smaller Rust executable size alone is not success.
 
 ## Required stable scope / 正式版范围
+User clarification, 2026-11-13: the **first usable release must include multiplayer**.
+Do not defer it behind a local-only first release or count a mock room as completion.
 - Multi-library installation, management and real game launch; official/PCL/HMCL
   layouts with isolated/shared/unknown states and explicit operation capability matrix.
 - Mod/resource/shader search, version choice, dependency choices, installation,
@@ -49,6 +51,12 @@ CI make the prototype reviewable and downloadable. Microsoft device login, DPAPI
 Java discovery/explicit choice and actual Vanilla 26.3 world/save/exit now extend this slice.
 Slint/WinUI comparison, old Java/game windows, runtime installation and server lifecycle
 remain open gates; this does not complete B or C.
+
+The November 13 follow-up implements a real Vanilla server/console/graceful-stop and
+EasyTier invitation/join slice, alongside persistent per-game launch preferences.
+Authenticated Vanilla 26.3 entry through two same-machine peers and normal world save
+were exercised. See MULTIPLAYER.md for exact scope. Stage D still requires two physical
+devices, external-network acceptance, supported server content/FRP and recovery flows.
 
 ## User task comparison / 体验对比
 First use, add existing library, install a game, install a mod, create/join multiplayer.

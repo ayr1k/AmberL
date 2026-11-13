@@ -12,7 +12,7 @@ Copy-Item (Join-Path $SlintTarget 'release/amberl-slint-probe.exe') -Destination
 # Preserve all SDK runtime assets and subdirectories; exclude build/debug products.
 Get-ChildItem local/ui-build/winui | Where-Object { $_.Name -notmatch '\.(pdb|lib|exp|ilk|iobj|ipdb|recipe)$' -and $_.Name -ne 'amberl-winui-probe.pri' } | Copy-Item -Destination (Join-Path $package 'winui') -Recurse
 Copy-Item assets/instance-icons/LICENSE-lucide.txt -Destination (Join-Path $package 'licenses')
-Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,design-qa.md -Destination $package
+Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,docs/MULTIPLAYER.md,design-qa.md -Destination $package
 Copy-Item scripts/make-fixture.ps1 -Destination (Join-Path $package 'scripts')
 git -c core.autocrlf=false archive --format=zip "--output=$package/AmberL-source.zip" HEAD
 if ($LASTEXITCODE) { throw 'Exact source archive failed' }

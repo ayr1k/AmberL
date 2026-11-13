@@ -4,7 +4,7 @@ A lightweight, carefully designed Minecraft game and multiplayer workstation.
 Ambrum is its UI-independent Rust core. **Early development: native launcher preview with authenticated Vanilla launch; not a finished product.**
 
 轻量、精致、易用的 Minecraft 游戏与联机工作站。减少必须做的决定，保留必要选择。
-**当前是开发预览：原生界面已接入微软账户、安全存储、Java 选择和原版启动；联机和完整兼容性验收尚未完成。**
+**当前是开发预览：原生界面已接入微软账户、安全存储、Java 选择、组件安装、原版启动，以及服务端和邀请联机；跨设备联机和完整兼容性验收尚未完成。**
 
 ## Current milestone / 当前进度
 
@@ -49,7 +49,7 @@ Path replacement or damaged configuration produces an error and preserves the ol
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
 Core 包保留扫描基线和命令行；UI 包中的 `launcher/amberl.exe` 是新的完整背景与毛玻璃界面。
-两者均为免安装开发预览，尚无联机工作站功能。原始扫描窗口不是新启动器界面。
+两者均为免安装开发预览。联机功能位于 UI 包的新启动器；原始扫描窗口不是新启动器界面。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
 For isolated testing, create an empty app-data directory and pass
@@ -139,6 +139,7 @@ future write operations. Do not import personal tokens, raw logs or caches into 
 - [Compatibility and evidence / 兼容范围与证据](docs/COMPATIBILITY.md)
 - [Validation record / 验证记录](docs/VALIDATION.md)
 - [Installation and recovery / 安装与恢复](docs/INSTALLATION.md)
+- [Multiplayer preview / 服务端与邀请联机](docs/MULTIPLAYER.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 Source: MPL-2.0. AMBER reference baseline:
@@ -161,3 +162,12 @@ version list, Fabric / Quilt / modern Forge / NeoForge installation, and creatio
 custom names with four AMBER icons. See [native UI](docs/NATIVE-UI.md) for exact limits
 and [loader verification](docs/LOADER-VERIFICATION.md) for tested combinations.
 无边框窗口、分步版本/组件选择和内置实例图标仍属于开发预览；不代表正式发布。
+
+### Multiplayer and saved launch choices / 联机与启动配置保存
+
+The first usable release includes multiplayer. This development slice adds independent
+Vanilla server lifecycle/console, verified EasyTier invitation rooms, status queries and
+Quick Play joining where supported. A real authenticated Vanilla 26.3 client entered a
+server through two room peers on one PC and exited normally; this does not establish
+two-device or public-relay acceptance. Per-game Java/account ID/memory choices persist.
+See [the multiplayer guide](docs/MULTIPLAYER.md) for host/join steps and open gates.

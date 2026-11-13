@@ -4,6 +4,34 @@ final result: passed
 
 This passes the requested visual correction, not final product/framework acceptance.
 
+## Multiplayer follow-up
+
+The new glass panel separates server control, creation, invitation, joining and console
+into five tabs. Labels, 40/44 px form/action rows and 12/16 px gaps follow the existing
+layout. The minimum-size panel reserves the integrated window-control area instead of
+putting its top border behind the close/maximize buttons. No live desktop capture is
+used for the glass texture.
+
+Native UI checks used 1280 x 820 and 1000 x 700 windows. GUI selection and startup of
+an existing disposable server reached its reported ready state; the GUI console's
+`list` command returned the actual player count. Same-named servers include a short
+registry ID to distinguish their entries.
+
+The GUI status query displayed the real local 26.3 server response (0/8 players),
+and Save and Stop produced server save logs and normal process exit. The native
+capture `docs/design/multiplayer-join.png` records the 1000 x 700 query state without
+an account name, room secret or external address.
+`docs/design/multiplayer-room.png` records the invitation tab at the same size with
+an empty invitation field and the public default endpoint; no connection was started
+to that endpoint for this capture.
+
+Observed interactions: an invalid URL is rejected as a game address without reporting
+reachability; unavailable launch/console actions stay disabled. Actual configuration
+save and launcher restart retained the selected game, authorized account reference,
+Java path and a distinct 3072 MiB test value. Real server/room/gameplay integration was
+tested through the core fixture (VALIDATION.md); this is distinct from full two-person
+GUI acceptance. Keyboard/Narrator/DPI/IME and two-device testing remain open.
+
 ## Current frameless and installation refinement
 
 The native Windows caption is removed. Window drag/resize, integrated maximize/restore

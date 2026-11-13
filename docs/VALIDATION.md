@@ -213,7 +213,7 @@ The original 60 tests remain in the Windows suite (77 total). Strict Clippy and 
 build passed. The package account/launch boundary, resource-plan and install CLI scripts
 passed. Real device authorization and game windows are intentionally not CI unit tests.
 
-## Limits
+## Historical limits of the initial account/launch slice
 No existing/shared-library update, integrated account/install/play UI, runtime download,
 per-instance saved Java preferences, general backup/restore, FRP, cross-device play,
 installer/upgrade or non-Windows acceptance. Java 8/old-game windows remain unverified.
@@ -221,4 +221,35 @@ The launcher is not a sandbox against hostile same-user writers. See AUTH-LAUNCH
 for local token/process visibility, graceful cancellation and portability boundaries.
 Slint/WinUI selection, full Chinese IME/reader/DPI matrix and AMBER resource comparison
 remain pending. Probe footprint cannot predict completed product footprint.
+
+## Multiplayer follow-up — 2026-11-13
+
+The first usable version now explicitly requires multiplayer. New core/model coverage
+brings the Windows workspace suite to **105 passing tests**. Strict workspace and Slint
+Clippy pass. Tests cover bounded addresses/status packets, invitation expiry/secrets,
+explicit port whitelists, server identity/hardlink refusal, independent worker
+cancellation, persistent choices and preservation of damaged/linked preferences.
+
+Real local test: Java 25.0.4 x64, Vanilla 26.3, one new app-owned world, official JAR
+and EasyTier 2.6.4 executable/DLL verification. A local relay and two separate no-TUN
+peers forwarded Minecraft TCP. The existing explicitly authorized test account joined;
+the online-mode server reported one connected player. The game exited normally (0),
+the server handled `stop` (0), `world/level.dat` existed, and the **same registered
+directory/world** restarted to readiness and stopped normally again. Final local
+fixture run ID: `024d48d5c86e4889b67010b3aa9c85b0`; no account/room secrets or raw game
+logs are committed. A Windows network permission prompt was left for the user.
+
+Initial failures were fixed and rerun: the pinned GitHub asset needs one constrained
+anonymous release-assets redirect; Windows needs the upstream Packet/wintun DLLs even
+in no-TUN mode; 26.3's default empty player whitelist prevented actual entry until
+new-server properties explicitly disabled it. Source verification also established
+that empty EasyTier whitelists disable filtering: guest TCP and all UDP now use port
+zero, with the selected game port alone permitted on the host. The final actual
+client/world-reload test passed with these restrictive arguments.
+
+This is **same-machine** integration evidence, not two physical devices, public-relay
+availability, NAT traversal, gameplay endurance or disconnect/reconnect acceptance.
+Modded-server creation/content synchronization, FRP, backup/import/recovery and broader
+deployment/accessibility matrices remain open. See MULTIPLAYER.md for current scope;
+the initial slice's historical UI/preferences limitations above are superseded.
 

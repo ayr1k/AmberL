@@ -98,68 +98,107 @@ impl Https {
 }
 impl Transport for Https {
     fn open(&self, url: &str) -> Result<Box<dyn Read>> {
-        let url = Self::parse(url)?;
-        unsafe {
-            let session = Handle::new(WinHttpOpen(
-                wide("AmberL/0.1 Ambrum").as_ptr(),
-                WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                null(),
-                null(),
-                0,
-            ))?;
-            checked(WinHttpSetTimeouts(session.0, 5000, 5000, 5000, 5000))?;
-            let connection =
-                Handle::new(WinHttpConnect(session.0, url.host.as_ptr(), url.port, 0))?;
-            let request = Handle::new(WinHttpOpenRequest(
-                connection.0,
-                wide("GET").as_ptr(),
-                url.path.as_ptr(),
-                null(),
-                null(),
-                null(),
-                WINHTTP_FLAG_SECURE,
-            ))?;
-            let disabled = WINHTTP_DISABLE_REDIRECTS
-                | WINHTTP_DISABLE_COOKIES
-                | WINHTTP_DISABLE_AUTHENTICATION;
-            checked(WinHttpSetOption(
-                request.0,
-                WINHTTP_OPTION_DISABLE_FEATURE,
-                (&disabled as *const u32).cast(),
-                4,
-            ))?;
-            let no_logon = WINHTTP_AUTOLOGON_SECURITY_LEVEL_HIGH;
-            checked(WinHttpSetOption(
-                request.0,
-                WINHTTP_OPTION_AUTOLOGON_POLICY,
-                (&no_logon as *const u32).cast(),
-                4,
-            ))?;
-            checked(WinHttpSendRequest(request.0, null(), 0, null(), 0, 0, 0))?;
-            checked(WinHttpReceiveResponse(request.0, null_mut()))?;
-            let mut status = 0u32;
-            let mut length = 4u32;
-            checked(WinHttpQueryHeaders(
-                request.0,
-                WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                null(),
-                (&mut status as *mut u32).cast(),
-                &mut length,
-                null_mut(),
-            ))?;
-            if status != 200 {
-                return Err(format!(
-                    "下载服务返回 HTTP {status}，未保存；重定向尚未支持 / HTTP {status} rejected"
-                ));
-            }
-            Ok(Box::new(Response {
-                request,
-                _connection: connection,
-                _session: session,
-            }))
-        }
+        request(url, false)
     }
 }
+/// One anonymous redirect for pinned EasyTier release bytes, never for account traffic.
+pub(crate) struct GithubRelease;
+impl Transport for GithubRelease {
+    fn open(&self, url: &str) -> Result<Box<dyn Read>> {
+        if !url.starts_with("https://github.com/EasyTier/EasyTier/releases/download/") {
+            return Err("Unsupported component origin".into());
+        }
+        request(url, true)
+    }
+}
+fn asset_redirect(url: &str) -> Result<()> {
+    Https::validate(url)?;
+    if !url.starts_with("https://release-assets.githubusercontent.com/") {
+        return Err("Untrusted component redirect rejected".into());
+    }
+    Ok(())
+}
+fn request(url: &str, github_redirect: bool) -> Result<Box<dyn Read>> {
+    let url = Https::parse(url)?;
+    unsafe {
+        let session = Handle::new(WinHttpOpen(
+            wide("AmberL/0.1 Ambrum").as_ptr(),
+            WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+            null(),
+            null(),
+            0,
+        ))?;
+        checked(WinHttpSetTimeouts(session.0, 5000, 5000, 5000, 5000))?;
+        let connection = Handle::new(WinHttpConnect(session.0, url.host.as_ptr(), url.port, 0))?;
+        let request = Handle::new(WinHttpOpenRequest(
+            connection.0,
+            wide("GET").as_ptr(),
+            url.path.as_ptr(),
+            null(),
+            null(),
+            null(),
+            WINHTTP_FLAG_SECURE,
+        ))?;
+        let disabled =
+            WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION;
+        checked(WinHttpSetOption(
+            request.0,
+            WINHTTP_OPTION_DISABLE_FEATURE,
+            (&disabled as *const u32).cast(),
+            4,
+        ))?;
+        let no_logon = WINHTTP_AUTOLOGON_SECURITY_LEVEL_HIGH;
+        checked(WinHttpSetOption(
+            request.0,
+            WINHTTP_OPTION_AUTOLOGON_POLICY,
+            (&no_logon as *const u32).cast(),
+            4,
+        ))?;
+        checked(WinHttpSendRequest(request.0, null(), 0, null(), 0, 0, 0))?;
+        checked(WinHttpReceiveResponse(request.0, null_mut()))?;
+        let mut status = 0u32;
+        let mut length = 4u32;
+        checked(WinHttpQueryHeaders(
+            request.0,
+            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            null(),
+            (&mut status as *mut u32).cast(),
+            &mut length,
+            null_mut(),
+        ))?;
+        if github_redirect && matches!(status, 301 | 302 | 303 | 307 | 308) {
+            let mut location = vec![0u16; 8192];
+            let mut bytes = (location.len() * 2) as u32;
+            checked(WinHttpQueryHeaders(
+                request.0,
+                WINHTTP_QUERY_LOCATION,
+                null(),
+                location.as_mut_ptr().cast(),
+                &mut bytes,
+                null_mut(),
+            ))?;
+            let end = location
+                .iter()
+                .position(|c| *c == 0)
+                .unwrap_or(location.len());
+            let target =
+                String::from_utf16(&location[..end]).map_err(|_| "Invalid component redirect")?;
+            asset_redirect(&target)?;
+            return Https.open(&target);
+        }
+        if status != 200 {
+            return Err(format!(
+                "下载服务返回 HTTP {status}，未保存；重定向尚未支持 / HTTP {status} rejected"
+            ));
+        }
+        Ok(Box::new(Response {
+            request,
+            _connection: connection,
+            _session: session,
+        }))
+    }
+}
+
 struct Response {
     request: Handle,
     _connection: Handle,
@@ -246,5 +285,27 @@ impl Drop for Hash {
                 BCryptCloseAlgorithmProvider(self.algorithm, 0);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod redirect_tests {
+    use super::*;
+    #[test]
+    fn pinned_component_redirect_is_exact_https_origin_only() {
+        assert!(asset_redirect("https://release-assets.githubusercontent.com/github-production-release-asset/test?x=y").is_ok());
+        for url in [
+            "http://release-assets.githubusercontent.com/x",
+            "https://127.0.0.1/x",
+            "https://release-assets.githubusercontent.com.evil/x",
+            "https://release-assets.githubusercontent.com@evil/x",
+        ] {
+            assert!(asset_redirect(url).is_err());
+        }
+        assert!(
+            GithubRelease
+                .open("https://github.com/other/project/releases/download/a")
+                .is_err()
+        );
     }
 }

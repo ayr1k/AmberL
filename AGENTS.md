@@ -39,3 +39,11 @@ Creation supports custom display names and AMBER grass/dirt/anvil/pickaxe icons.
 Fabric, Quilt and modern Forge/NeoForge are actual installation paths, not mock choices;
 keep older-loader and additional-mod limits explicit. This does not authorize merging,
 a stable release, or declaring Slint's final framework/accessibility acceptance complete.
+
+## First usable release includes multiplayer — 2026-11-13
+
+Multiplayer is required for the first usable version, not a later optional milestone.
+Keep actual server lifecycle, invitation transport and game joining independently
+testable. A same-machine two-peer test is not two-device/NAT acceptance. Retain the
+broader stable scope and make remaining modded-server/FRP/recovery limits explicit.
+Only app-owned test worlds; graceful saves and no firewall/security-setting changes.

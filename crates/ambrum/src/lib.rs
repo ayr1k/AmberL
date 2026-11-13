@@ -17,13 +17,19 @@ pub mod library;
 pub mod loader;
 #[cfg(windows)]
 pub mod manifest;
+#[cfg(windows)]
+pub mod multiplayer;
 pub mod paths;
+#[cfg(windows)]
+pub mod preferences;
 #[cfg(windows)]
 pub mod prepare;
 #[cfg(windows)]
 pub mod registry;
 #[cfg(windows)]
 pub mod secure;
+#[cfg(windows)]
+mod state;
 pub mod task;
 #[cfg(windows)]
 mod transaction;
