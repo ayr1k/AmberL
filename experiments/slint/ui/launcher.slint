@@ -1,0 +1,215 @@
+// SPDX-License-Identifier: MPL-2.0
+import { Button, LineEdit, ComboBox, SpinBox, ListView, TextEdit, AboutSlint, Palette } from "std-widgets.slint";
+
+
+export struct GameRow { id: string, title: string, subtitle: string }
+export global GlassAssets {
+    in-out property <bool> ready: false;
+    pure callback tile(float, float, float, float, float, float) -> image;
+}
+component Action inherits Rectangle {
+    in property <string> label;
+    in property <string> hint;
+    in property <bool> primary: false;
+    in property <bool> flat: false;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 44px; min-width: 64px; border-radius: 9px;
+    background: primary ? (!enabled ? #4c897c80 : touch.has-hover ? #86e5c9 : #62d6b4) : selected ? #76ddbc2c : touch.has-hover ? #ffffff20 : flat ? transparent : #ffffff0c;
+    border-width: focus.has-focus ? 2px : primary || flat ? 0px : 1px;
+    border-color: focus.has-focus ? #c1f5e8 : selected ? #96ead55c : #ffffff14;
+    accessible-role: button; accessible-label: hint + " " + label; accessible-enabled: enabled;
+    accessible-action-default => { if enabled { root.clicked(); } }
+    if hint != "": Text { x: 16px; y: 8px; width: parent.width - 32px; height: 16px; text: root.hint; color: #aec4c6; font-size: 11px; overflow: elide; }
+    Text { x: root.hint == "" ? 8px : 16px; y: root.hint == "" ? 0px : 26px; width: parent.width - (root.hint == "" ? 16px : 32px); height: root.hint == "" ? parent.height : 22px;
+        text: root.label; color: !root.enabled ? #b4c3c2 : root.primary ? #102d27 : #f2f6f3; font-size: root.primary ? 20px : 14px;
+        font-weight: root.primary || root.selected ? 600 : 400; horizontal-alignment: root.hint == "" ? center : left; vertical-alignment: center; overflow: elide;
+    }
+    focus := FocusScope { enabled: root.enabled;
+        key-pressed(event) => { if event.text == "\n" || event.text == " " { root.clicked(); return accept; } return reject; }
+    }
+    touch := TouchArea { enabled: root.enabled; clicked => { focus.focus(); root.clicked(); } }
+}
+// Reuse one blurred full-scene texture; offsets keep the frosted view aligned on resize.
+component Glass inherits Rectangle {
+    in property <length> viewport-width;
+    in property <length> viewport-height;
+    in property <length> scene-x;
+    in property <length> scene-y;
+    in property <color> tint: #11232fa8;
+    border-radius: 15px; clip: true;
+    Image { x: 0px; y: 0px; width: parent.width; height: parent.height;
+        source: GlassAssets.ready ? GlassAssets.tile(root.scene-x / 1px, root.scene-y / 1px, root.width / 1px, root.height / 1px, root.viewport-width / 1px, root.viewport-height / 1px) : @image-url("");
+        image-fit: fill;
+    }
+    Rectangle { x: 0px; y: 0px; width: parent.width; height: parent.height; background: root.tint; border-radius: 15px; border-width: 1px; border-color: #e0fff42c; }
+    @children
+}
+
+export component Launcher inherits Window {
+    init => { Palette.color-scheme = dark; }
+    title: "AmberL · 开发预览";
+    background: #171c20; default-font-family: "Microsoft YaHei UI"; default-font-size: 16px;
+    preferred-width: 1280px; preferred-height: 820px; min-width: 1000px; min-height: 700px;
+    in property <[GameRow]> games;
+    in property <string> selected-id;
+    in property <string> game-title: "你的下一段冒险";
+    in property <string> game-subtitle: "安装游戏，或添加已有游戏库";
+    in property <string> status;
+    in property <string> task-log;
+    in property <string> device-prompt;
+    in property <bool> busy;
+    in property <bool> running;
+    in property <bool> launch-candidate;
+    in property <[string]> account-options;
+    in property <string> account-label: "登录微软账户";
+    in-out property <int> account-index: 0;
+    in property <[string]> java-options;
+    in-out property <int> java-index: 0;
+    in-out property <string> java-path;
+    in-out property <int> memory-mib: 4096;
+    in-out property <string> library-path;
+    in-out property <string> install-parent;
+    in-out property <string> install-name: "vanilla-26.3";
+    in-out property <string> install-version: "26.3";
+    in-out property <int> budget-gib: 4;
+    in-out property <int> panel: 0;
+    callback select-game(string); callback refresh(); callback add-library(); callback install-game();
+    callback login(); callback logout(); callback open-microsoft(); callback discover-java();
+    callback choose-account(int); callback choose-java(int); callback launch(); callback cancel(); callback open-folder();
+
+    // Explicit origins prevent Slint's automatic child centering from shifting the scene.
+    Image { x: 0px; y: 0px; width: root.width; height: root.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
+    Rectangle { x: 0px; y: 0px; width: root.width; height: root.height; background: #081b2528; }
+    if root.panel == 0: Rectangle {
+        x: 0px; y: 0px; width: root.width; height: root.height; background: transparent;
+        Glass {
+            x: 24px; y: 20px; width: parent.width - 48px; height: 64px;
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
+            Image { x: 18px; y: 10px; width: 154px; height: 44px; source: @image-url("../../../assets/launcher/amberl-lockup-dark.png"); image-fit: contain; accessible-label: "AmberL"; }
+            Action { x: 196px; y: 12px; width: 72px; height: 40px; label: "游戏"; selected: true; clicked => { root.panel=0; } }
+            Action { x: 276px; y: 12px; width: 72px; height: 40px; label: "联机"; flat: true; clicked => { root.panel=6; } }
+            Action { x: parent.width - 248px; y: 12px; width: 72px; height: 40px; label: "任务"; flat: true; clicked => { root.panel=5; } }
+            Action { x: parent.width - 168px; y: 12px; width: 72px; height: 40px; label: "设置"; flat: true; clicked => { root.panel=2; } }
+            Action { x: parent.width - 88px; y: 12px; width: 72px; height: 40px; label: "关于"; flat: true; clicked => { root.panel=7; } }
+        }
+        Glass {
+            x: parent.width - 368px; y: 108px; width: 344px; height: min(root.height - 310px, 152px + max(1, root.games.length) * 84px);
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
+            Text { x: 20px; y: 20px; width: 220px; height: 30px; text: "我的游戏"; color: #f3f6f2; font-size: 22px; font-weight: 600; }
+            Action { x: parent.width - 76px; y: 16px; width: 60px; height: 36px; label: "刷新"; flat: true; enabled: !root.busy; clicked => { root.refresh(); } }
+            if root.games.length == 0: Text { x: 20px; y: 76px; width: parent.width - 40px; text: "还没有游戏\n安装一个原版，或添加已有游戏库。"; color: #c2d2d1; font-size: 14px; wrap: word-wrap; }
+            if root.games.length > 0: ListView {
+                x: 12px; y: 68px; width: parent.width - 24px; height: parent.height - 136px;
+                    for game in root.games: Rectangle {
+                        height: 78px; border-radius: 10px;
+                        background: root.selected-id == game.id ? #8fedcf26 : row-touch.has-hover ? #ffffff14 : transparent;
+                        border-width: row-focus.has-focus || root.selected-id == game.id ? 1px : 0px; border-color: #8bdcc58a;
+                        accessible-role: button; accessible-label: game.title + " " + game.subtitle; accessible-enabled: !root.busy;
+                        accessible-action-default => { if !root.busy { root.select-game(game.id); } }
+                        Rectangle { x: 12px; y: 12px; width: 54px; height: 54px; clip: true; border-radius: 8px;
+                            Image { x: 0px; y: 0px; width: parent.width; height: parent.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
+                        }
+                        Text { x: 80px; y: 14px; width: parent.width - 94px; height: 25px; text: game.title; color: #f2f6f2; font-size: 18px; font-weight: 600; overflow: elide; }
+                        Text { x: 80px; y: 43px; width: parent.width - 94px; height: 20px; text: game.subtitle; color: #c0cfce; font-size: 11px; overflow: elide; }
+                        row-focus := FocusScope { enabled: !root.busy; key-pressed(event) => { if event.text == "\n" || event.text == " " { root.select-game(game.id); return accept; } return reject; } }
+                        row-touch := TouchArea { enabled: !root.busy; clicked => { row-focus.focus(); root.select-game(game.id); } }
+                    }
+            }
+            HorizontalLayout { x: 16px; y: parent.height - 56px; width: parent.width - 32px; height: 40px; spacing: 8px;
+                Action { height: 40px; label: "安装游戏"; enabled: !root.busy; clicked => { root.panel=4; } }
+                Action { height: 40px; label: "添加游戏库"; enabled: !root.busy; clicked => { root.panel=3; } }
+            }
+        }
+        Rectangle { x: 48px; y: parent.height - 304px; width: parent.width - 464px; height: 144px; background: transparent;
+            Text { x: 0px; y: 0px; width: parent.width; height: 20px; text: "MINECRAFT / JAVA EDITION"; color: #c2dbd2; font-size: 12px; letter-spacing: 2px; }
+            Text { x: 0px; y: 31px; width: parent.width; height: 70px; text: root.game-title; color: #f3f6ee; font-size: root.width < 1150px ? 38px : 48px; font-weight: 700; overflow: elide; }
+            Text { x: 0px; y: 112px; width: parent.width; height: 26px; text: root.game-subtitle; color: #d0ded8; font-size: 16px; overflow: elide; }
+        }
+        Glass {
+            x: 24px; y: parent.height - 136px; width: parent.width - 48px; height: 100px;
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: #10252fb8;
+            HorizontalLayout { x: 18px; y: 22px; width: parent.width - 36px; height: 56px; spacing: 10px;
+                Action { width: 180px; height: 56px; hint: "微软账户"; label: root.account-label; clicked => { root.panel=1; } }
+                Action { width: 140px; height: 56px; hint: "JAVA 运行环境"; label: root.java-path == "" ? "选择 Java" : "已选择 Java"; enabled: !root.busy; clicked => { root.panel=2; } }
+                Action { width: 132px; height: 56px; hint: "最大内存"; label: root.memory-mib + " MiB"; enabled: !root.busy; clicked => { root.panel=2; } }
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                Action { width: 76px; height: 56px; label: "配置"; flat: true; enabled: !root.busy; clicked => { root.panel=2; } }
+                Action { width: 208px; height: 56px; primary: true; label: root.running ? "游戏运行中" : root.busy ? "正在处理…" : "启动游戏";
+                    enabled: !root.busy && root.launch-candidate && root.account-index > 0 && root.java-path != "";
+                    clicked => { root.launch(); }
+                }
+            }
+        }
+        Text { x: 30px; y: parent.height - 27px; width: parent.width - 60px; height: 20px; text: root.status; color: #a7c0bd; font-size: 11px; overflow: elide; }
+    }
+    if root.panel != 0: Rectangle {
+        x: 0px; y: 0px; width: root.width; height: root.height; background: #07151b64;
+        TouchArea { }
+        Glass { x: (parent.width - self.width)/2; y: (parent.height - self.height)/2; width: min(720px,parent.width - 80px);
+            height: min(root.panel == 3 || root.panel == 6 ? 340px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 400px : root.panel == 2 ? 540px : 640px, parent.height - 60px);
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: #10232dde;
+            VerticalLayout { padding: 32px; spacing: 16px;
+                HorizontalLayout {
+                    Text { text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装原版游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
+                    Action { width: 100px; label: "返回游戏"; clicked => { root.panel=0; } }
+                }
+                if root.panel == 1: VerticalLayout {
+                    spacing: 16px;
+                    Text { text: "登录由微软官方网页完成。账户保存在当前 Windows 用户的安全存储中。"; wrap: word-wrap; color: #becacb; }
+                    ComboBox { model: root.account-options; current-index <=> root.account-index; enabled: !root.busy; selected(value) => { root.choose-account(self.current-index); } }
+                    HorizontalLayout {
+                        Button { text: "登录微软账户"; enabled: !root.busy; clicked => { root.login(); } }
+                        Button { text: "退出所选账户"; enabled: !root.busy && root.account-index > 0; clicked => { root.logout(); } }
+                    }
+                    if root.device-prompt != "": TextEdit { text: root.device-prompt; read-only: true; accessible-label: "微软设备登录信息"; height: 190px; }
+                    if root.device-prompt != "": Button { text: "打开微软官方登录页面"; clicked => { root.open-microsoft(); } }
+                    Text { text: "退出只移除本机登录信息，不退出已经运行的游戏。"; color: #aab8ba; wrap: word-wrap; }
+                }
+                if root.panel == 2: VerticalLayout {
+                    spacing: 14px;
+                    Text { text: "明确选择 Java 与内存；本轮选择在当前会话有效。"; color: #becacb; wrap: word-wrap; }
+                    Button { text: "查找本机 Java"; enabled: !root.busy; clicked => { root.discover-java(); } }
+                    ComboBox { model: root.java-options; current-index <=> root.java-index; enabled: !root.busy; selected(value) => { root.choose-java(self.current-index); } }
+                    Text { text: "Java 可执行文件（java.exe）"; color: #d9e2e0; }
+                    LineEdit { text <=> root.java-path; enabled: !root.busy; accessible-label: "Java 可执行文件"; }
+                    HorizontalLayout { Text { text: "最大内存（MiB）"; color: #d9e2e0; } SpinBox { value <=> root.memory-mib; minimum: 512; maximum: 65536; enabled: !root.busy; } }
+                    Button { text: "打开所选游戏目录"; enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
+                    Text { text: "只启动 AmberL 创建的完整原版安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"; color: #aab8ba; wrap: word-wrap; }
+                }
+                if root.panel == 3: VerticalLayout {
+                    spacing: 18px;
+                    Text { text: "填写 .minecraft 或 AmberL 安装目录。只保存位置，不移动、删除或导入原文件。"; color: #becacb; wrap: word-wrap; }
+                    LineEdit { text <=> root.library-path; placeholder-text: "游戏库完整路径"; accessible-label: "游戏库完整路径"; enabled: !root.busy; }
+                    Button { text: "登记并扫描"; enabled: !root.busy && root.library-path != ""; clicked => { root.add-library(); } }
+                }
+                if root.panel == 4: VerticalLayout {
+                    spacing: 12px;
+                    Text { text: "从官方来源下载并校验，在已有父目录下创建新的独立安装。不会覆盖同名目录。"; color: #becacb; wrap: word-wrap; }
+                    Text { text: "游戏版本"; color: #d9e2e0; }
+                    LineEdit { text <=> root.install-version; enabled: !root.busy; accessible-label: "安装游戏版本"; }
+                    Text { text: "安装父目录（需已存在，且与应用数据目录分离）"; color: #d9e2e0; }
+                    LineEdit { text <=> root.install-parent; enabled: !root.busy; accessible-label: "安装父目录"; }
+                    Text { text: "新文件夹名称"; color: #d9e2e0; }
+                    LineEdit { text <=> root.install-name; enabled: !root.busy; accessible-label: "新安装文件夹名称"; }
+                    HorizontalLayout { Text { text: "缓存与安装各自预算（GiB）"; color: #d9e2e0; } SpinBox { value <=> root.budget-gib; minimum: 1; maximum: 128; enabled: !root.busy; } }
+                    Button { text: "下载、校验并安装"; enabled: !root.busy && root.install-parent != ""; clicked => { root.install-game(); } }
+                }
+                if root.panel == 5: VerticalLayout {
+                    spacing: 12px;
+                    TextEdit { text: root.task-log; read-only: true; accessible-label: "任务记录"; height: min(320px,root.height - 400px); }
+                    Text { text: "启动进程不等于已进入世界。取消运行中的游戏会请求正常退出，并等待游戏结束。"; color: #becacb; wrap: word-wrap; }
+                }
+                if root.panel == 6: Text { text: "联机工作区仍在开发\n\n服务端管理、FRP 与加入房间将在后续阶段接入。当前不报告连接或在线状态。"; color: #becacb; wrap: word-wrap; }
+                if root.panel == 7: VerticalLayout {
+                    Text { text: "AmberL · 原生桌面开发预览\nAmbrum Rust 核心 / MPL-2.0\n沿用 AMBER 图形标志，青绿色为 AmberL 识别色。\nSlint 为当前界面实现，最终框架验收尚未完成。"; color: #becacb; wrap: word-wrap; }
+                    AboutSlint {}
+                }
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.status; color: #c7d5d3; wrap: word-wrap; }
+                if root.busy: Button { text: root.running ? "请求游戏正常退出" : "取消当前操作"; clicked => { root.cancel(); } }
+            }
+        }
+    }
+}

@@ -1,10 +1,10 @@
 # AmberL / Ambrum
 
 A lightweight, carefully designed Minecraft game and multiplayer workstation.
-Ambrum is its UI-independent Rust core. **Early development: authenticated Vanilla core/CLI prototype; not a finished launcher.**
+Ambrum is its UI-independent Rust core. **Early development: native launcher preview with authenticated Vanilla launch; not a finished product.**
 
 轻量、精致、易用的 Minecraft 游戏与联机工作站。减少必须做的决定，保留必要选择。
-**当前是开发样机：命令行已支持微软登录、安全存储、Java 选择和原版实际启动；尚未完成启动器界面与联机功能。**
+**当前是开发预览：原生界面已接入微软账户、安全存储、Java 选择和原版启动；联机和完整兼容性验收尚未完成。**
 
 ## Current milestone / 当前进度
 
@@ -32,8 +32,10 @@ The original Windows UI remains a **system-control comparison baseline**. Separa
 [Slint and WinUI 3 samples](docs/UI-COMPARISON.md) now exercise the same Rust model;
 input/accessibility/DPI acceptance remains open. No framework selection or final design
 is implied. No WebView or Node process.
-Installation and authenticated launch are available through the CLI only. The integrated
-UI, third-party content and full process/exit UX remain future work. A detected loader
+The [integrated launcher preview](docs/NATIVE-UI.md) uses the selected dark visual direction,
+full-window scenery and cached Gaussian glass panels. Open `launcher/amberl.exe` in the
+UI package for real account/Java/library/install/launch controls. Third-party content and
+full process/exit UX remain future work. A detected loader
 is **not** a claim of launch compatibility.
 
 ## Try the development probe / 试用开发样机
@@ -46,8 +48,8 @@ Path replacement or damaged configuration produces an error and preserves the ol
 
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
-当前包是免安装开发样机；登录、原版安装与启动使用命令行，尚无联机工作站功能。
-原生窗口仍是扫描／登记基线，外观不是最终设计。
+Core 包保留扫描基线和命令行；UI 包中的 `launcher/amberl.exe` 是新的完整背景与毛玻璃界面。
+两者均为免安装开发预览，尚无联机工作站功能。原始扫描窗口不是新启动器界面。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
 For isolated testing, create an empty app-data directory and pass

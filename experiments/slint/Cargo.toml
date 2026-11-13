@@ -6,6 +6,10 @@ license = "MPL-2.0"
 
 [dependencies]
 amberl-ui-model = { path = "../../crates/amberl-ui-model" }
+amberl-desktop-model = { path = "../../crates/amberl-desktop-model" }
+ambrum = { path = "../../crates/ambrum" }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_SystemInformation"] }
 slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-software", "accessibility", "compat-1-2"] }
 
 [profile.release]

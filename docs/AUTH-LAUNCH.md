@@ -1,7 +1,9 @@
 # Microsoft accounts, Java and Vanilla launch
 
-This Stage B slice is a Windows x64 **core/CLI prototype**. The native scan window
-has no login or play controls. Slint/WinUI selection and integrated UI remain open.
+This Stage B slice includes a Windows x64 core/CLI and an integrated native launcher
+preview. See [native UI](NATIVE-UI.md) for graphical account, Java, installation and
+launch controls. The original scan/comparison windows remain separate; final
+framework acceptance remains open.
 
 ## Try it / 测试步骤
 

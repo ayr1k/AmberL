@@ -1,7 +1,8 @@
 # Stage B: native UI comparison / 原生界面对照样机
 
-These are two working comparison hosts, not the final launcher UI. The existing
-authenticated CLI launch slice remains available separately. No framework is selected
+These are two working comparison hosts, not the final launcher UI. The package now
+also includes the separate [integrated launcher preview](NATIVE-UI.md) in `launcher/`.
+The authenticated CLI launch slice remains available separately. No framework is selected
 yet: Chinese IME composition, reader acceptance, DPI transitions and clean-machine
 deployment still gate the decision.
 

@@ -2,7 +2,11 @@
 
 Project source: Mozilla Public License 2.0; see LICENSE.
 Ambrum's behavior references AMBER at 3af52c7 (MPL-2.0). No private credentials,
-AMBER artwork/fonts or Electron runtime are included.
+other products' account files, bundled fonts or Electron runtime are included.
+The user supplied and authorized reuse of the AMBER graphic logo for AmberL.
+The derived dark logo retains that shape, with a teal center and terminal L.
+The voxel landscape and dark lockup in assets/launcher were produced with Image Gen;
+they are interface artwork, not screenshots or redistributed Minecraft game resources.
 
 The initial locked Rust graph includes serde/serde_core/serde_derive,
 serde_json, proc-macro2, quote, syn, unicode-ident, itoa, memchr, zmij,
@@ -16,7 +20,7 @@ Windows system libraries and system fonts are used from the OS, not redistribute
 The download adapter also calls Windows WinHTTP (TLS/system certificates) and CNG
 (SHA-1/SHA-256). No separate networking/crypto runtime is bundled.
 
-No Slint, egui, WinUI, Minecraft, Java, mod or FRP binary is redistributed by this probe.
+The core probe does not redistribute Slint, egui, WinUI, Minecraft, Java, mod or FRP binaries.
 Dependencies and notices must be reviewed again as those capabilities are introduced.
 
 New-directory installation uses zip 9.5.1 (MIT), with only stored/Deflate reading
@@ -44,4 +48,9 @@ The C++/WinRT host uses locked Microsoft Windows App SDK 2.6.5 components and SD
 runtime assets, with original Microsoft notices. WebView2 metadata/loader is a build
 dependency of WinUI projections, not an embedded browser or instantiated WebView.
 Windows and the Microsoft Visual C++ x64 runtime remain host prerequisites.
+
+The integrated launcher also uses image 0.25.10 (MIT OR Apache-2.0) for a cached
+Gaussian blur of the embedded static scene. The PNG decoder and its locked transitive
+dependencies are covered by the UI package's original license files. It does not
+capture or blur the desktop or other applications.
 

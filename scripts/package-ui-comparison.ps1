@@ -6,11 +6,12 @@ $revision = (git rev-parse HEAD).Trim()
 & ./scripts/build-ui-comparison.ps1 -Offline:$Offline
 $package = Join-Path (Get-Location) ('artifacts/AmberL-ui-comparison-' + $revision.Substring(0,8))
 if (Test-Path -LiteralPath $package) { throw 'Retain previous packages; choose a new revision' }
-New-Item -ItemType Directory -Path $package,(Join-Path $package 'slint'),(Join-Path $package 'winui'),(Join-Path $package 'scripts'),(Join-Path $package 'licenses') | Out-Null
+New-Item -ItemType Directory -Path $package,(Join-Path $package 'launcher'),(Join-Path $package 'slint'),(Join-Path $package 'winui'),(Join-Path $package 'scripts'),(Join-Path $package 'licenses') | Out-Null
+Copy-Item local/ui-target/slint/release/amberl.exe -Destination (Join-Path $package 'launcher')
 Copy-Item local/ui-target/slint/release/amberl-slint-probe.exe -Destination (Join-Path $package 'slint')
 # Preserve all SDK runtime assets and subdirectories; exclude build/debug products.
 Get-ChildItem local/ui-build/winui | Where-Object { $_.Name -notmatch '\.(pdb|lib|exp|ilk|iobj|ipdb|recipe)$' -and $_.Name -ne 'amberl-winui-probe.pri' } | Copy-Item -Destination (Join-Path $package 'winui') -Recurse
-Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md -Destination $package
+Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,design-qa.md -Destination $package
 Copy-Item scripts/make-fixture.ps1 -Destination (Join-Path $package 'scripts')
 git -c core.autocrlf=false archive --format=zip "--output=$package/AmberL-source.zip" HEAD
 if ($LASTEXITCODE) { throw 'Exact source archive failed' }
