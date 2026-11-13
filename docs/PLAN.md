@@ -45,9 +45,10 @@ No calendar estimate is made before UI/dependency feasibility and first measurem
 
 Resumed stage B work adds actual official HTTPS discovery, a new-directory Vanilla
 installation transaction and bounded native extraction/recovery. Draft PR #1 and Windows
-CI make the prototype reviewable and downloadable. Slint/WinUI comparison, authentication,
-OS token storage, real Java/game windows and server process lifecycle remain open gates;
-this installation slice does not complete B or C.
+CI make the prototype reviewable and downloadable. Microsoft device login, DPAPI storage,
+Java discovery/explicit choice and actual Vanilla 26.3 world/save/exit now extend this slice.
+Slint/WinUI comparison, old Java/game windows, runtime installation and server lifecycle
+remain open gates; this does not complete B or C.
 
 ## User task comparison / 体验对比
 First use, add existing library, install a game, install a mod, create/join multiplayer.

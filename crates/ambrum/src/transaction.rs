@@ -458,3 +458,6 @@ fn rename_handle(file: &File, destination: &Path) -> Result<()> {
 pub(crate) fn recover(parent: &Path, operation: &str, cancel: &Cancellation) -> Result<PathBuf> {
     Destination::open(parent)?.resume(operation)?.commit(cancel)
 }
+
+mod installed;
+pub(crate) use installed::Installed;

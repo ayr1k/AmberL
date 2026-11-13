@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! UI-independent inspection, resource preparation and explicit new-directory installation.
-//! Attaching an external game library remains read-only; no login or game execution yet.
+//! External library attachment remains read-only; authenticated launch uses owned installations.
+#[cfg(windows)]
+pub mod auth;
 #[cfg(windows)]
 pub mod catalog;
 #[cfg(windows)]
@@ -8,6 +10,8 @@ pub mod download;
 #[cfg(windows)]
 pub mod install;
 pub mod java;
+#[cfg(windows)]
+pub mod launch;
 pub mod library;
 #[cfg(windows)]
 pub mod manifest;
@@ -16,6 +20,8 @@ pub mod paths;
 pub mod prepare;
 #[cfg(windows)]
 pub mod registry;
+#[cfg(windows)]
+pub mod secure;
 pub mod task;
 #[cfg(windows)]
 mod transaction;

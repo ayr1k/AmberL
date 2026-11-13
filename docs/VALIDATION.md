@@ -179,10 +179,46 @@ It is a UEFI-only dependency, not linked into the Windows binary. Packaging now 
 Cargo's filtered build-target resolve graph and includes notices for every reachable
 Windows dependency, retaining strict failure for a missing notice in that graph.
 
+## Authenticated Vanilla checkpoint (2026-11-13)
+
+Actual user-completed Microsoft device authorization succeeded through Ambrum's fixed
+WinHTTP endpoints, followed by Xbox/XSTS, Minecraft entitlement and profile verification.
+A separate CLI process reopened the Windows-current-user DPAPI record and refreshed it
+successfully. No other launcher's account files were read. The local test account stays
+only in the ignored, independently chosen app directory; it is not in source/artifacts.
+
+The official 26.3 metadata declares Java 25. Its SHA-1 was
+`9f67e10ed013deeaad20ac3c800652765d493408`. Actual Ambrum download verified 5,226
+objects / 617,204,502 bytes. One interrupted request was retried explicitly; the retry
+reused 5,014 verified cache objects and completed the missing resources. The new isolated
+installation materialized 5,227 files / 617,247,540 bytes (no legacy native extraction).
+
+With explicitly selected Microsoft OpenJDK 25.0.4 amd64 and 4,096 MiB maximum heap,
+Ambrum rechecked official metadata, installed files and ownership and started Minecraft
+26.3. Windows UI observation confirmed the welcome screen, main menu, new singleplayer
+world, save-and-quit to title, and normal game exit with code 0. This uses disposable
+data, not an original world. The final packaged-revision recheck and exact executable/
+artifact hashes are recorded on Draft PR #1; TEST-REVISION.txt pins each package source.
+Core process events correctly keep readiness `unknown`; these visible observations are
+separate acceptance evidence, not readiness inferred from a process ID.
+
+Seventeen new focused tests cover device polling/backoff/expiry/cancellation, fixed
+destinations and safe errors; entitlement/profile refusal; DPAPI reopen/logout, no
+plaintext bytes, corrupted/future/linked records, exclusive locks, rotated refresh
+persistence before downstream failure and identity changes; Java major/architecture and
+memory choices, exact argument boundaries, unknown placeholders, expired identity,
+session conflicts and held payloads, changed/moved/linked installations, preserving an
+unknown game directory, and cross-chunk credential redaction/oversized-line omission.
+The original 60 tests remain in the Windows suite (77 total). Strict Clippy and release
+build passed. The package account/launch boundary, resource-plan and install CLI scripts
+passed. Real device authorization and game windows are intentionally not CI unit tests.
+
 ## Limits
-No Minecraft authentication, visible game/world, existing-instance update, installation UI,
-general backup/restore, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
-New-directory materialization and complete-stage recovery are the only new write capabilities.
+No existing/shared-library update, integrated account/install/play UI, runtime download,
+per-instance saved Java preferences, general backup/restore, FRP, cross-device play,
+installer/upgrade or non-Windows acceptance. Java 8/old-game windows remain unverified.
+The launcher is not a sandbox against hostile same-user writers. See AUTH-LAUNCH.md
+for local token/process visibility, graceful cancellation and portability boundaries.
 Slint/WinUI selection, full Chinese IME/reader/DPI matrix and AMBER resource comparison
 remain pending. Probe footprint cannot predict completed product footprint.
 

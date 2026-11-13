@@ -31,3 +31,8 @@ SetFileInformationByHandle performs the no-replacement directory commit.
 Official Minecraft metadata/resources are downloaded only into a user's explicitly
 chosen development cache/install directory, never redistributed in the probe ZIP.
 
+Account authentication uses form_urlencoded and percent-encoding (MIT OR Apache-2.0),
+and zeroize/zeroize_derive (MIT OR Apache-2.0). Windows DPAPI provides current-user
+credential encryption. No separate authentication broker, browser runtime or crypto
+service is bundled. Exact locked versions and original license texts ship in the package.
+

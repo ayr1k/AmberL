@@ -6,6 +6,28 @@ fn main() {
     let result = match args.as_slice() {
         [command, path] if command == "scan" => Library::open(Path::new(path)).and_then(|l| l.scan(&Cancellation::default())).and_then(|s| serde_json::to_string_pretty(&s).map_err(|e| e.to_string())),
         [command, path] if command == "java" => ambrum::java::inspect(Path::new(path), &Cancellation::default()).and_then(|j| serde_json::to_string_pretty(&j).map_err(|e| e.to_string())),
+        [command] if command == "java-list" => ambrum::java::discover(&Cancellation::default()).and_then(|j| serde_json::to_string_pretty(&j).map_err(|e| e.to_string())),
+        #[cfg(windows)]
+        [command, app, game, version, java, account, memory, os] if command == "launch-vanilla" || command == "check-launch" => cancellable(|cancel| {
+            let selection = ambrum::launch::Selection {
+                app_directory: Path::new(app), game_directory: Path::new(game),
+                version: version.to_str().ok_or("Invalid version")?, java_executable: Path::new(java),
+                account_id: account.to_str().ok_or("Invalid account ID")?,
+                max_memory_mib: memory.to_str().and_then(|s| s.parse().ok()).ok_or("Explicit memory in MiB required")?,
+                os_version: os.to_str().ok_or("Invalid Windows version")?,
+            };
+            if command == "check-launch" {
+                serde_json::to_string_pretty(&ambrum::launch::preflight(&selection, cancel)?).map_err(|e| e.to_string())
+            } else {
+                let result = ambrum::launch::run(&selection, cancel, |event| {
+                    if let Ok(text) = serde_json::to_string(&event) { eprintln!("{text}"); }
+                })?;
+                let output = serde_json::to_string_pretty(&result).map_err(|e| e.to_string())?;
+                if result.success { Ok(output) } else { Err(output) }
+            }
+        }),
+        #[cfg(windows)]
+        [command, directory, rest @ ..] if command == "accounts" => accounts(Path::new(directory), rest),
         #[cfg(windows)]
         [command, directory, rest @ ..] if command == "libraries" => registered(Path::new(directory), rest),
         #[cfg(windows)]
@@ -25,7 +47,7 @@ fn main() {
             let path = ambrum::install::recover(Path::new(parent), operation.to_str().ok_or("Invalid operation ID")?, cancel)?;
             serde_json::to_string_pretty(&serde_json::json!({"game_directory":path,"launch_verified":false})).map_err(|e| e.to_string())
         }),
-        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json> | prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes> | resolve-vanilla <app-directory> <version> | install-vanilla <app-directory> <metadata.json> <windows-os-version> <install-parent> <new-name> <max-bytes> | recover-install <install-parent> <operation-id>\nDeveloper probe. Installation creates new isolated directories only. Does not authenticate or launch Minecraft.".into()),
+        _ => Err("Usage: amberl-inspect java-list | accounts <app-directory> [login | verify <id> | remove <id>] | check-launch/launch-vanilla <app-directory> <game-directory> <version> <java.exe> <account-id> <memory-MiB> <windows-os-version> | scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json> | prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes> | resolve-vanilla <app-directory> <version> | install-vanilla <app-directory> <metadata.json> <windows-os-version> <install-parent> <new-name> <max-bytes> | recover-install <install-parent> <operation-id>\nDeveloper probe. Installation creates new isolated directories only. Authenticated launch supports complete AmberL-created Vanilla installations with an explicit matching x64 Java. Native probe UI remains read-only.".into()),
     };
     match result {
         Ok(output) => println!("{output}"),
@@ -33,6 +55,60 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(windows)]
+fn accounts(directory: &Path, args: &[std::ffi::OsString]) -> ambrum::Result<String> {
+    use ambrum::{
+        auth::{DeviceFlow, Poll, http::Https},
+        secure::Store,
+    };
+    use std::io::Write;
+    match args {
+        [] => serde_json::to_string_pretty(&Store::open(directory)?.profiles())
+            .map_err(|e| e.to_string()),
+        [action] if action == "login" => cancellable(|cancel| {
+            // Check secure storage accessibility before requesting account consent.
+            drop(Store::open(directory)?);
+            ambrum::secure::check_available()?;
+            let mut flow = DeviceFlow::begin(&Https, cancel)?;
+            println!(
+                "{}",
+                serde_json::to_string(flow.prompt()).map_err(|_| "Cannot present device code")?
+            );
+            std::io::stdout()
+                .flush()
+                .map_err(|_| "Cannot present device code")?;
+            loop {
+                match flow.poll(&Https, cancel)? {
+                    Poll::Waiting => std::thread::sleep(std::time::Duration::from_millis(200)),
+                    Poll::Authorized(auth) => {
+                        return serde_json::to_string_pretty(
+                            &Store::open(directory)?.save_authorization(auth)?,
+                        )
+                        .map_err(|e| e.to_string());
+                    }
+                }
+            }
+        }),
+        [action, id] if action == "verify" => cancellable(|cancel| {
+            let identity = Store::open(directory)?.authenticate(
+                id.to_str().ok_or("Invalid account ID")?,
+                &Https,
+                cancel,
+            )?;
+            serde_json::to_string_pretty(&identity.profile).map_err(|e| e.to_string())
+        }),
+        [action, id] if action == "remove" => {
+            let mut store = Store::open(directory)?;
+            store.forget(id.to_str().ok_or("Invalid account ID")?)?;
+            serde_json::to_string_pretty(&store.profiles()).map_err(|e| e.to_string())
+        }
+        _ => Err(
+            "Usage: accounts <app-directory> [login | verify <account-id> | remove <account-id>]"
+                .into(),
+        ),
     }
 }
 

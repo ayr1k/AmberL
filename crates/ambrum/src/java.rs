@@ -17,6 +17,86 @@ pub struct Java {
     pub home: String,
 }
 
+#[derive(Serialize)]
+pub struct Candidate {
+    pub executable: std::path::PathBuf,
+    pub java: Option<Java>,
+    pub issue: Option<String>,
+}
+
+/// Bounded discovery of conventional locations; never changes an existing choice.
+pub fn discover(cancel: &Cancellation) -> Result<Vec<Candidate>> {
+    let mut paths = Vec::new();
+    if let Some(home) = std::env::var_os("JAVA_HOME") {
+        paths.push(std::path::PathBuf::from(home).join("bin/java.exe"));
+    }
+    if let Some(path) = std::env::var_os("PATH") {
+        paths.extend(
+            std::env::split_paths(&path)
+                .take(256)
+                .map(|p| p.join("java.exe")),
+        );
+    }
+    for variable in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(base) = std::env::var_os(variable) {
+            for vendor in [
+                "Java",
+                "Microsoft",
+                "Eclipse Adoptium",
+                "AdoptOpenJDK",
+                "Amazon Corretto",
+            ] {
+                if let Ok(entries) = std::fs::read_dir(std::path::Path::new(&base).join(vendor)) {
+                    for entry in entries.take(64).flatten() {
+                        paths.push(entry.path().join("bin/java.exe"));
+                    }
+                }
+            }
+        }
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut candidates = Vec::new();
+    for path in paths {
+        cancel.check()?;
+        if candidates.len() >= 32 {
+            break;
+        }
+        let Ok(path) = paths::ordinary(&path) else {
+            continue;
+        };
+        if !path.is_file() || !seen.insert(path.to_string_lossy().to_lowercase()) {
+            continue;
+        }
+        let (java, issue) = match inspect(&path, cancel) {
+            Ok(java) => (Some(java), None),
+            Err(e) => (None, Some(e)),
+        };
+        candidates.push(Candidate {
+            executable: path,
+            java,
+            issue,
+        });
+    }
+    Ok(candidates)
+}
+
+/// Exact metadata major is the supported baseline, not an inferred minimum.
+pub fn compatible(java: &Java, required: Option<u32>) -> Result<()> {
+    let required = required.ok_or(
+        "Java requirement unknown; this launch path requires official metadata with a Java major",
+    )?;
+    if java.major != required {
+        return Err(format!(
+            "请选择 Java {required}，当前为 Java {} / Select the required Java major",
+            java.major
+        ));
+    }
+    if !matches!(java.architecture.as_str(), "amd64" | "x86_64") {
+        return Err("This Windows launch path requires x64 Java".into());
+    }
+    Ok(())
+}
+
 pub fn parse(output: &str) -> Result<Java> {
     let property = |key: &str| {
         output.lines().find_map(|line| {

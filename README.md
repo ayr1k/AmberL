@@ -1,10 +1,10 @@
 # AmberL / Ambrum
 
 A lightweight, carefully designed Minecraft game and multiplayer workstation.
-Ambrum is its UI-independent Rust core. **Early development: not a usable launcher yet.**
+Ambrum is its UI-independent Rust core. **Early development: authenticated Vanilla core/CLI prototype; not a finished launcher.**
 
 轻量、精致、易用的 Minecraft 游戏与联机工作站。减少必须做的决定，保留必要选择。
-**当前是开发样机：支持原版新目录安装的命令行验证，尚不能登录、启动游戏或联机。**
+**当前是开发样机：命令行已支持微软登录、安全存储、Java 选择和原版实际启动；尚未完成启动器界面与联机功能。**
 
 ## Current milestone / 当前进度
 
@@ -16,7 +16,7 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - Handle-checked directory identity, exclusive registry lock and staged app-only saves.
 - Streaming HTTPS artifact cache with size + SHA-1/SHA-256 verification, cancellation,
   explicit retry and corrupt-cache recovery (core/CLI; not game installation).
-- CLI Java executable inspection with timeout, cancellation and bounded output.
+- Bounded Java discovery/inspection and explicit executable selection with exact official major/x64 checks.
 - Read-only Vanilla version/asset plans with platform rules, Java requirements,
   separate native archives, exact argument boundaries and conflicting-path rejection.
 - Batch Vanilla cache preparation: verified asset-index discovery, explicit byte budget,
@@ -24,12 +24,14 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
 - Official version discovery with bounded HTTPS metadata and catalog SHA-1 verification.
 - New isolated Vanilla directory installation from verified cache, bounded native ZIP
   extraction, explicit disk budget and recoverable no-replacement directory commit.
+- Microsoft device login, Xbox/Minecraft ownership/profile checks and independent Windows DPAPI storage.
+- Authenticated Vanilla sessions with pinned installed resources, separate arguments, own-process exit and redacted output.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
 not a substitute for the Slint/WinUI selection experiment. No WebView or Node process.
-Installation is available through the CLI only. Login, launch, the integrated installation
-UI, third-party content and process supervision remain future work. A detected loader
+Installation and authenticated launch are available through the CLI only. The integrated
+UI, third-party content and full process/exit UX remain future work. A detected loader
 is **not** a claim of launch compatibility.
 
 ## Try the development probe / 试用开发样机
@@ -42,7 +44,7 @@ Path replacement or damaged configuration produces an error and preserves the ol
 
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
-当前包是免安装开发样机；原版安装验证使用命令行，不能登录、启动游戏或联机。
+当前包是免安装开发样机；登录、原版安装与启动使用命令行，尚无联机工作站功能。
 原生窗口仍是扫描／登记基线，外观不是最终设计。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
@@ -140,3 +142,10 @@ Source: MPL-2.0. AMBER reference baseline:
 The core is newly written Rust informed by AMBER's layouts, constraints and regressions;
 AMBER's Electron/Node service graph is not embedded. No stable release is authorized.
 
+
+## Accounts and actual launch / 账户与真实启动
+
+See [login, Java and launch instructions](docs/AUTH-LAUNCH.md). Windows device login,
+protected account reopen/refresh, explicit Java 25 and Vanilla 26.3 menu/world/save/exit
+have been tested on a new disposable instance. This is a CLI vertical slice, not a
+final UI or completion of Stage B. No original game/account data was reused.

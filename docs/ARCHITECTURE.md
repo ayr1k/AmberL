@@ -10,7 +10,8 @@
 4. AmberL installation/app/settings/cache/update identity is independent. Public
    Microsoft Client ID `ab7cf49a-fea7-432d-8ce8-beb922eb554e`, consumers authority and
    `XboxLive.SignIn XboxLive.offline_access` match AMBER's source by user instruction.
-   No client secret is required/copied. Actual login is not implemented/accepted yet.
+   No client secret is required/copied. Device login and independent DPAPI storage now
+   have actual Microsoft/Xbox/Minecraft acceptance; see AUTH-LAUNCH.md.
 5. Filesystem mutations must use plan / validate / stage / verify / revalidate / commit
    / journal recovery. Never introduce a write API by treating this read-only scanner's
    canonical path check as a race-free capability.
@@ -63,8 +64,8 @@ TLS uses OS certificate validation. Cookies, automatic auth/logon and redirects 
 URLs are not included in diagnostics; the cache contains no account credentials.
 Retry starts a new attempt; there is no automatic retry storm or partial HTTP resume.
 Normal failures/cancellation remove staged files; process-crash residue is ignored, with
-cache quota/cleanup and crash-recovery UI still pending. No archive extraction or game
-installation is implemented, and returned cache paths do not authorize later game writes.
+cache quota/cleanup and crash-recovery UI still pending. The separate installation module now materializes new directories; returned cache paths
+alone do not authorize later game writes.
 
 Version planning preserves argument arrays, explicit Java requirements, native archive
 separation and legacy asset mappings. It rejects custom entrypoints, inherited metadata,
@@ -101,11 +102,21 @@ Tab/focus/reader navigation, high contrast, 100/125/150/200% DPI and monitor tra
 virtual lists, log backpressure, rendering/backend cost and clean-machine deployment.
 Reject unusable input/accessibility even if package size is attractive.
 
-## Next concrete slice
-Dependency access and initial GitHub/CI delivery are now working through normal Git.
-New-directory materialization and complete-stage recovery extend the earlier cache slice;
-they do not provide updates to existing/shared game directories. Next: comparable UI samples,
-auth with OS credential storage, Java selection and actual Vanilla launch in disposable
-directories. Verify Java 8/modern Java and visible menus/worlds before scaling out loaders.
-Server lifecycle feasibility also precedes full local polish. Stage B remains incomplete.
+## Authenticated session slice
+Authentication uses a separate fixed-endpoint WinHTTP transport, never the public
+artifact downloader. Device flow yields an ephemeral identity after entitlement/profile
+verification. A current-user DPAPI store persists refresh material under an independent
+application identity, with no plaintext fallback. Java discovery returns candidates;
+launch requires an explicit path/account/memory selection and exact x64/major match.
 
+Launch re-resolves official metadata, pins and checks an owned installed instance, then
+refreshes the selected account immediately before spawning Java with separate arguments.
+The session holds immutable files and the physical instance lock until its own child exits.
+Process creation is reported separately from unknown readiness; output is bounded/redacted.
+See [authentication/session contract](AUTH-LAUNCH.md) for threat boundaries and limitations.
+
+## Next concrete slice
+Comparable Slint/WinUI samples, runtime installation/per-instance preferences, Java 8/old
+game-window acceptance and server lifecycle remain Stage B gates. Integrated account/launch
+UI follows the framework experiment. Existing/shared library modification, loaders and
+multiplayer are separate capabilities. Stage B remains incomplete.

@@ -1,7 +1,8 @@
 # Compatibility: explicit capabilities
 
 These are the **initial probe's** capabilities, not the stable product contract.
-All real Minecraft launching/installing/mutating/restoring is currently unimplemented.
+External-library launch/update/restore remain unsupported. Separately, AmberL-created
+Vanilla installations now support authenticated Windows x64 CLI launch; see AUTH-LAUNCH.md.
 
 | Input | Inspect | Isolation evidence | Launch / install / modify / restore |
 |---|---|---|---|
@@ -24,8 +25,8 @@ OS filesystem read is not promised to interrupt immediately. Windows app-only re
 supports up to 256 libraries; missing/replaced roots fail when opened, retaining registration.
 The read-only path strategy does not guarantee isolation against hostile concurrent path
 replacement. Registered scans additionally guard the root and its ancestors by handles;
-individual game metadata remains read-only. Game writes remain disabled until the resource
-transaction and shared-content locking layer exists. Registry detach is not game deletion.
+individual game metadata remains read-only. External-library writes remain disabled; new isolated installation/session capabilities
+do not authorize modifying an attached external library. Registry detach is not game deletion.
 
 ## Metadata planning only
 
@@ -61,3 +62,12 @@ AMBER 1.7.1 has bounded external launch support; its loader recognition and prio
 results do not establish AmberL compatibility. Modern Forge/NeoForge module launchers
 and old Java native-window behavior are explicit future test cases.
 
+
+## Current authenticated-launch cell
+
+Vanilla 26.3 + explicit x64 Microsoft OpenJDK 25.0.4: actual Microsoft authorization,
+DPAPI reopen, fresh entitlement/profile, visible menu, new world and normal save/exit
+verified in a new AmberL installation. Java 8 and older game windows are still unverified.
+Other Java majors must exactly match official metadata and need their own game acceptance.
+Moved/copied instance adoption, loaders, shared/external directories and offline launch
+are not supported by this path. See [launch boundaries](AUTH-LAUNCH.md).
