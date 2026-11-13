@@ -4,7 +4,37 @@ final result: passed
 
 This passes the requested visual correction, not final product/framework acceptance.
 
-## Visual truth and evidence
+## Current frameless and installation refinement
+
+The native Windows caption is removed. Window drag/resize, integrated maximize/restore
+and normal close were exercised on the dedicated QA build; the user's older test
+window was retained. Alt+Space opens the system menu without triggering a focused
+button. Modified Enter/Space no longer activate custom buttons accidentally.
+
+Current native captures (not renders):
+- `docs/design/refined-home.png`: 1280 x 820, integrated window controls and aligned
+  account/Java/memory/launch dock; real disposable loader installations.
+- `docs/design/refined-accounts.png`: compact account panel, consistent label/field
+  alignment and separated login/logout actions, no private account name displayed.
+- `docs/design/refined-versions.png`: official version list at 1000 x 700, selected
+  version and next action visible. Loading/cancel state also checked at this size.
+- `docs/design/refined-loaders.png`: actual Fabric provider response and all four
+  loader choices, with bounded spacing at 1000 x 700.
+- `docs/design/refined-install.png`: creation name, four built-in icons, location,
+  folder, budget and install action all fit at 1000 x 700; switching to pickaxe
+  updates the preview. Missing required location keeps installation disabled.
+
+The wizard uses the tested desktop/core installation path. Real four-loader install,
+launch and normal-exit results are recorded in `docs/LOADER-VERIFICATION.md`; those
+installations were driven through the developer harness, not every GUI combination.
+Custom creation names/icons survive model reload. File-based custom artwork and
+editing existing instance identity are not part of this iteration.
+
+The historical acceptance caveats below still apply, especially Narrator, IME,
+multi-monitor DPI, full keyboard traversal and clean-machine deployment. These
+screenshots do not claim final accessibility or universal loader compatibility.
+
+## Earlier glass-scene iteration
 
 - Original selected direction: `docs/design/selected-dark-launcher.png`, 1487×1058.
 - User correction overrides its fixed dark columns: full-window scenery, Aero-like

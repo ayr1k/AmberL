@@ -108,6 +108,17 @@ fn archive(
     Ok(archive)
 }
 
+/// Fail early before downloads; the transaction repeats these checks at commit time.
+pub fn check_destination(app: &Path, parent: &Path, name: &str) -> Result<()> {
+    crate::paths::name(name)?;
+    let app = crate::paths::ordinary(app)?;
+    let parent = crate::paths::ordinary(parent)?;
+    if parent.starts_with(&app) || app.starts_with(&parent) {
+        return Err("安装位置与应用数据目录重叠".into());
+    }
+    Destination::open(&parent)?.check_target(name)
+}
+
 /// Requires all provider resources in Cache first. The explicit budget counts every
 /// materialized copy, metadata and expanded native bytes, not just unique downloads.
 /// Parent and new_name are captured inputs, never a UI's current selection.

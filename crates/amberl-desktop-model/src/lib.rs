@@ -28,6 +28,7 @@ pub struct Game {
     pub root: PathBuf,
     pub version: String,
     pub title: String,
+    pub icon: String,
     pub subtitle: String,
     /// A display hint only. launch::run rechecks receipts, identity and all resources.
     pub installation_hint: bool,
@@ -44,7 +45,7 @@ pub struct LaunchChoice {
 impl LaunchChoice {
     pub fn capture(game: &Game, java: &str, account: &str, memory: i32, os: &str) -> Result<Self> {
         if !game.installation_hint {
-            return Err("此游戏库仅供查看；请先使用 AmberL 安装原版游戏".into());
+            return Err("此游戏库仅供查看；请先使用 AmberL 完成游戏安装".into());
         }
         if java.trim().is_empty() || account.is_empty() {
             return Err("请明确选择微软账户和 Java".into());
@@ -67,6 +68,8 @@ impl LaunchChoice {
 enum Message {
     Data(Vec<Game>, Vec<Profile>),
     Java(Vec<Candidate>),
+    Catalog(Vec<ambrum::catalog::Version>),
+    Loaders(String, String, Vec<String>),
     Prompt(String),
     Status(String),
     Started,
@@ -74,6 +77,8 @@ enum Message {
 }
 enum Operation {
     Reload,
+    Catalog,
+    Loaders(String, String),
     Attach(PathBuf),
     Java,
     Login,
@@ -84,6 +89,10 @@ enum Operation {
         parent: PathBuf,
         name: String,
         budget: u64,
+        title: String,
+        icon: String,
+        loader: Option<ambrum::loader::Choice>,
+        java: PathBuf,
         os: String,
     },
 }
@@ -97,6 +106,10 @@ pub struct Model {
     pub games: Vec<Game>,
     pub accounts: Vec<Profile>,
     pub java: Vec<Candidate>,
+    pub catalog: Vec<ambrum::catalog::Version>,
+    pub loaders: Vec<String>,
+    pub loader_key: (String, String),
+    pub catalog_revision: u64,
     pub selected: Option<String>,
     pub status: String,
     pub device_prompt: String,
@@ -114,6 +127,10 @@ impl Model {
             games: vec![],
             accounts: vec![],
             java: vec![],
+            catalog: vec![],
+            loaders: vec![],
+            loader_key: (String::new(), String::new()),
+            catalog_revision: 0,
             selected: None,
             status: "选择或安装一个游戏".into(),
             device_prompt: String::new(),
@@ -187,6 +204,19 @@ impl Model {
         }
         self.start(Operation::Launch(choice))
     }
+    pub fn catalog(&mut self) -> Result<()> {
+        self.start(Operation::Catalog)
+    }
+    pub fn loaders(&mut self, game: String, kind: String) -> Result<()> {
+        if !self.catalog.iter().any(|v| v.id == game) {
+            return Err("请先从列表选择游戏版本".into());
+        }
+        self.loaders.clear();
+        self.loader_key = (game.clone(), kind.clone());
+        self.catalog_revision += 1;
+        self.start(Operation::Loaders(game, kind))
+    }
+    #[allow(clippy::too_many_arguments)]
     pub fn install(
         &mut self,
         version: String,
@@ -194,9 +224,23 @@ impl Model {
         name: String,
         budget_gib: i32,
         os: String,
+        title: String,
+        icon: String,
+        loader: Option<ambrum::loader::Choice>,
+        java: PathBuf,
     ) -> Result<()> {
         ambrum::paths::name(&version)?;
         ambrum::paths::name(&name)?;
+        if !self.catalog.iter().any(|v| v.id == version) {
+            return Err("请从官方版本列表选择游戏".into());
+        }
+        if let Some(l) = &loader
+            && (self.loader_key != (version.clone(), l.kind.clone())
+                || !self.loaders.contains(&l.version))
+        {
+            return Err("加载器选择已失效，请重新选择".into());
+        }
+        ambrum::loader::display(&mut serde_json::json!({}), &title, &icon)?;
         if !(1..=128).contains(&budget_gib) || os.is_empty() {
             return Err("请选择 1–128 GiB 的安装预算，并确认 Windows 版本".into());
         }
@@ -206,6 +250,10 @@ impl Model {
             name,
             budget: budget_gib as u64 * 1024 * 1024 * 1024,
             os,
+            title,
+            icon,
+            loader,
+            java,
         })
     }
     pub fn cancel(&mut self) {
@@ -287,6 +335,23 @@ impl Model {
                     self.java_revision += 1;
                     self.revision += 1;
                 }
+                Message::Catalog(versions) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.catalog = versions;
+                    self.catalog_revision += 1;
+                    self.revision += 1;
+                }
+                Message::Loaders(game, kind, versions) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.loader_key = (game, kind);
+                    self.loaders = versions;
+                    self.catalog_revision += 1;
+                    self.revision += 1;
+                }
                 Message::Prompt(prompt) => {
                     if worker.cancel.check().is_err() {
                         continue;
@@ -348,8 +413,26 @@ fn reload(
         match registry.scan(&entry.id, cancel) {
             Ok(scan) => {
                 for instance in scan.instances.into_iter().take(20000 - games.len()) {
-                    let hint = entry.path.join("installation.ready.json").is_file()
-                        && instance.loader == "Vanilla";
+                    let hint = entry.path.join("installation.ready.json").is_file();
+                    let metadata = ambrum::paths::json(
+                        &entry.path,
+                        &entry
+                            .path
+                            .join("versions")
+                            .join(&instance.name)
+                            .join(format!("{}.json", instance.name)),
+                    )
+                    .ok();
+                    let display = metadata.as_ref().and_then(|m| m.get("amberlDisplay"));
+                    let title = display
+                        .and_then(|d| d["name"].as_str())
+                        .unwrap_or(&instance.name)
+                        .to_owned();
+                    let icon = display
+                        .and_then(|d| d["icon"].as_str())
+                        .filter(|i| ["grass", "dirt", "anvil", "pickaxe"].contains(i))
+                        .unwrap_or("grass")
+                        .to_owned();
                     let isolation = match instance.isolation {
                         Isolation::Isolated => "独立目录",
                         Isolation::Shared => "共享目录",
@@ -361,7 +444,8 @@ fn reload(
                         library_id: entry.id.clone(),
                         root: entry.path.clone(),
                         version: instance.name.clone(),
-                        title: instance.name,
+                        title,
+                        icon,
                         subtitle: format!(
                             "{} · {} · {}",
                             instance.game,
@@ -400,6 +484,15 @@ fn execute(
 ) -> Result<()> {
     match operation {
         Operation::Reload => reload(app, cancel, sender),
+        Operation::Catalog => send(
+            sender,
+            Message::Catalog(ambrum::catalog::list(&ambrum::download::Https, cancel)?),
+        ),
+        Operation::Loaders(game, kind) => {
+            let versions =
+                ambrum::loader::versions(&game, &kind, &ambrum::download::Https, cancel)?;
+            send(sender, Message::Loaders(game, kind, versions))
+        }
         Operation::Attach(path) => {
             Registry::open(app)?.attach(&path)?;
             reload(app, cancel, sender)
@@ -484,15 +577,37 @@ fn execute(
             name,
             budget,
             os,
+            title,
+            icon,
+            loader,
+            java,
         } => {
+            ambrum::install::check_destination(app, &parent, &name)?;
             let cache = Cache::open(app)?;
             let resolved =
                 ambrum::catalog::resolve(&cache, &version, &ambrum::download::Https, cancel)?;
-            let metadata = ambrum::paths::json(
+            let mut metadata = ambrum::paths::json(
                 resolved.metadata_path.parent().ok_or("缺少元数据目录")?,
                 &resolved.metadata_path,
             )?;
             let platform = Platform::windows_x64(&os);
+            if let Some(choice) = loader {
+                send(
+                    sender,
+                    Message::Status(format!("正在准备 {} {}…", choice.kind, choice.version)),
+                )?;
+                metadata = ambrum::loader::resolve(
+                    &cache,
+                    &metadata,
+                    &choice,
+                    &java,
+                    &platform,
+                    budget,
+                    &ambrum::download::Https,
+                    cancel,
+                )?;
+            }
+            ambrum::loader::display(&mut metadata, &title, &icon)?;
             let mut last = Instant::now() - Duration::from_secs(1);
             ambrum::prepare::vanilla(
                 &cache,
@@ -556,9 +671,38 @@ mod tests {
             root: "test-game".into(),
             version: "26.3".into(),
             title: "原版生存".into(),
+            icon: "grass".into(),
             subtitle: String::new(),
             installation_hint: true,
         }
+    }
+    #[test]
+    fn stale_loader_cannot_start_an_install_worker() {
+        let mut m = Model::new(PathBuf::from("unused"));
+        m.catalog = vec![ambrum::catalog::Version {
+            id: "26.3".into(),
+            kind: "release".into(),
+        }];
+        m.loaders = vec!["0.20.1".into()];
+        m.loader_key = ("26.2".into(), "Fabric".into());
+        assert!(
+            m.install(
+                "26.3".into(),
+                "unused".into(),
+                "new".into(),
+                4,
+                "10.0.26200".into(),
+                "name".into(),
+                "grass".into(),
+                Some(ambrum::loader::Choice {
+                    kind: "Fabric".into(),
+                    version: "0.20.1".into()
+                }),
+                "java.exe".into()
+            )
+            .is_err()
+        );
+        assert!(!m.busy());
     }
     #[test]
     fn launch_captures_immutable_selection_and_rejects_missing_inputs() {

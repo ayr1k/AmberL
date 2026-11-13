@@ -1,10 +1,10 @@
-param([switch]$Offline)
+param([switch]$Offline, [string]$SlintTarget = "local/ui-target/slint")
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $env:CARGO_TARGET_DIR = Join-Path (Get-Location) 'target'
 cargo build -p amberl-ui-bridge --release --locked
 if ($LASTEXITCODE) { throw 'Rust bridge build failed' }
-$env:CARGO_TARGET_DIR = Join-Path (Get-Location) 'local/ui-target/slint'
+$env:CARGO_TARGET_DIR = Join-Path (Get-Location) $SlintTarget
 $env:SLINT_STYLE = 'fluent'
 $cargoArgs = @('build','--manifest-path','experiments/slint/Cargo.toml','--release','--locked')
 if ($Offline) { $cargoArgs += '--offline' }

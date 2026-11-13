@@ -91,3 +91,11 @@ bounded diagnostic tail. The prototype is not the final launcher or Stage B comp
 References: [Microsoft device flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code),
 [Windows CryptProtectData](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata),
 [CryptUnprotectData](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptunprotectdata).
+
+## Loader extension — 2026-11-13
+
+The historical `launch-vanilla` developer command also accepts AmberL-created resolved
+loader installations. Official base metadata is reverified, and the sealed loader
+profile merge plus display metadata are reconstructed before every launch. See
+[loader verification](LOADER-VERIFICATION.md) for real tested versions and remaining
+compatibility limits; earlier Vanilla-specific acceptance below remains historical.

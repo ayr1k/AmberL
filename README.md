@@ -153,3 +153,11 @@ See [login, Java and launch instructions](docs/AUTH-LAUNCH.md). Windows device l
 protected account reopen/refresh, explicit Java 25 and Vanilla 26.3 menu/world/save/exit
 have been tested on a new disposable instance. This is a CLI vertical slice, not a
 final UI or completion of Stage B. No original game/account data was reused.
+
+### Native installation wizard (development)
+
+The glass launcher now has integrated window controls, a searchable official game
+version list, Fabric / Quilt / modern Forge / NeoForge installation, and creation-time
+custom names with four AMBER icons. See [native UI](docs/NATIVE-UI.md) for exact limits
+and [loader verification](docs/LOADER-VERIFICATION.md) for tested combinations.
+无边框窗口、分步版本/组件选择和内置实例图标仍属于开发预览；不代表正式发布。

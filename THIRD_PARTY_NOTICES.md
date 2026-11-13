@@ -54,3 +54,11 @@ Gaussian blur of the embedded static scene. The PNG decoder and its locked trans
 dependencies are covered by the UI package's original license files. It does not
 capture or blur the desktop or other applications.
 
+
+Built-in instance icons reuse AMBER's project-owned generated grass-block illustration
+and unmodified Lucide 0.468.0 box/anvil/pickaxe SVGs. Original ISC/Feather MIT notices
+are retained in assets/instance-icons/LICENSE-lucide.txt and copied into test packages.
+SVG theme tint is applied only by the native renderer. No Minecraft textures are bundled.
+Official Minecraft and loader binaries are downloaded for the user's selected instance,
+not included in source or test ZIPs. Forge/NeoForge installers execute only when that
+component is explicitly selected and are not redistributed with AmberL.

@@ -25,7 +25,11 @@ pub struct Resolved {
     pub cache_hit: bool,
 }
 
-fn bounded(transport: &impl Transport, url: &str, cancel: &Cancellation) -> Result<Vec<u8>> {
+pub(crate) fn bounded(
+    transport: &impl Transport,
+    url: &str,
+    cancel: &Cancellation,
+) -> Result<Vec<u8>> {
     cancel.check()?;
     let started = Instant::now();
     let mut input = transport.open(url)?;
@@ -49,6 +53,43 @@ fn bounded(transport: &impl Transport, url: &str, cancel: &Cancellation) -> Resu
     }
     cancel.check()?;
     Ok(bytes)
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Version {
+    pub id: String,
+    pub kind: String,
+}
+/// Keep provider order (newest first), reject ambiguous identities before selection.
+pub fn list(transport: &impl Transport, cancel: &Cancellation) -> Result<Vec<Version>> {
+    let data: Value = serde_json::from_slice(&bounded(transport, OFFICIAL_CATALOG, cancel)?)
+        .map_err(|_| "Invalid official version catalog")?;
+    parse_list(&data)
+}
+fn parse_list(data: &Value) -> Result<Vec<Version>> {
+    let items = data["versions"].as_array().ok_or("Missing version list")?;
+    if items.len() > 20_000 {
+        return Err("Version catalog entry limit".into());
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    items
+        .iter()
+        .map(|v| {
+            let id = v["id"].as_str().ok_or("Invalid version identity")?;
+            paths::name(id)?;
+            if !seen.insert(id.to_lowercase()) {
+                return Err("Duplicate version identity".into());
+            }
+            let kind = v["type"].as_str().ok_or("Missing version type")?;
+            if !matches!(kind, "release" | "snapshot" | "old_beta" | "old_alpha") {
+                return Err("Unknown version type".into());
+            }
+            Ok(Version {
+                id: id.into(),
+                kind: kind.into(),
+            })
+        })
+        .collect()
 }
 
 pub fn resolve(
@@ -146,6 +187,19 @@ mod tests {
             } else {
                 self.metadata.clone()
             })))
+        }
+    }
+    #[test]
+    fn version_list_preserves_order_and_rejects_bad_or_ambiguous_ids() {
+        let rows=parse_list(&json!({"versions":[{"id":"26.3","type":"release"},{"id":"26.3-snapshot-1","type":"snapshot"}]})).unwrap();
+        assert_eq!(rows[0].id, "26.3");
+        assert_eq!(rows[1].kind, "snapshot");
+        for data in [
+            json!({"versions":[{"id":"../x","type":"release"}]}),
+            json!({"versions":[{"id":"A","type":"release"},{"id":"a","type":"release"}]}),
+            json!({"versions":[{"id":"a","type":"future-unknown"}]}),
+        ] {
+            assert!(parse_list(&data).is_err());
         }
     }
     #[test]

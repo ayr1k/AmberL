@@ -29,3 +29,13 @@ Never describe a read-only probe as a working launcher or a UI baseline as final
 Document exact source revision, checks and limitations in task deliveries.
 Generated packages stay out of commits. Keep concise English/Chinese documentation.
 
+
+## Accepted native UI direction — 2026-11-13
+
+Retain full-window scenery, static-scene Gaussian glass and the AMBER graphic mark
+with AmberL teal center/L. Use app-integrated window controls (no Windows caption),
+compact aligned dialogs, a searchable version list and a staged installation flow.
+Creation supports custom display names and AMBER grass/dirt/anvil/pickaxe icons.
+Fabric, Quilt and modern Forge/NeoForge are actual installation paths, not mock choices;
+keep older-loader and additional-mod limits explicit. This does not authorize merging,
+a stable release, or declaring Slint's final framework/accessibility acceptance complete.

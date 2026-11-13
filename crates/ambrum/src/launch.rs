@@ -115,12 +115,13 @@ fn prepare(selection: &Selection<'_>, cancel: &Cancellation) -> Result<Prepared>
             .ok_or("Missing metadata parent")?,
         &resolved.metadata_path,
     )?;
+    let mut installed = Installed::open(selection.game_directory, cancel)?;
+    let installed_metadata =
+        installed.json(&format!("versions/{0}/{0}.json", selection.version))?;
+    crate::loader::verify_metadata(&metadata, &installed_metadata)?;
+    let metadata = installed_metadata;
     let plan = VersionPlan::parse(&metadata, &Platform::windows_x64(selection.os_version))?;
     java::compatible(&java, plan.java_major)?;
-    let mut installed = Installed::open(selection.game_directory, cancel)?;
-    if installed.json(&format!("versions/{0}/{0}.json", plan.version))? != metadata {
-        return Err("Installed metadata differs from the official selected version".into());
-    }
     installed.verify_official(&plan, cancel)?;
     installed.check_game_paths(cancel)?;
     let report = Preflight {

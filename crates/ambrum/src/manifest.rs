@@ -222,7 +222,18 @@ impl VersionPlan {
             );
         }
         let main = string(metadata, "mainClass")?;
-        if main != "net.minecraft.client.main.Main" {
+        if !matches!(
+            main,
+            "net.minecraft.client.main.Main"
+                | "net.fabricmc.loader.impl.launch.knot.KnotClient"
+                | "net.fabricmc.loader.launch.knot.KnotClient"
+                | "org.quiltmc.loader.impl.launch.knot.KnotClient"
+                | "net.minecraftforge.bootstrap.ForgeBootstrap"
+                | "cpw.mods.bootstraplauncher.BootstrapLauncher"
+                | "cpw.mods.modlauncher.Launcher"
+                | "net.neoforged.fml.startup.Client"
+                | "net.neoforged.bootstraploader.Bootstrap"
+        ) {
             return Err("This plan supports the standalone Vanilla entrypoint only".into());
         }
         let java_major = metadata
@@ -304,6 +315,20 @@ impl VersionPlan {
             }
             if !included {
                 return Err("Applicable library has no supported download".into());
+            }
+        }
+        if let Some(extra) = metadata.get("amberlExtra") {
+            let extra = list(extra)?;
+            if extra.len() > 4096 {
+                return Err("Loader extra file limit".into());
+            }
+            for file in extra {
+                add_file(
+                    &mut files,
+                    format!("libraries/{}", string(file, "path")?),
+                    "loader_output",
+                    file,
+                )?;
             }
         }
         classpath.push(client_path);

@@ -6,19 +6,43 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
 #[path = "../glass.rs"]
 mod glass;
-slint::slint! { export { Launcher, GameRow, GlassAssets } from "ui/launcher.slint"; }
+slint::slint! { export { Launcher, GameRow, GlassAssets, VersionRow } from "ui/launcher.slint"; }
 
 #[derive(Default)]
 struct View {
     revision: u64,
     data_revision: u64,
     java_revision: u64,
+    catalog_revision: u64,
     account: Option<String>,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
         values.into_iter().map(Into::into).collect::<Vec<_>>(),
     ))
+}
+fn filter_versions(ui: &Launcher, model: &Model) {
+    let query = ui.get_version_search().to_lowercase();
+    let filter = ui.get_version_filter();
+    ui.set_versions(ModelRc::new(VecModel::from(
+        model
+            .catalog
+            .iter()
+            .filter(|v| {
+                v.id.to_lowercase().contains(&query)
+                    && match filter {
+                        0 => v.kind == "release",
+                        1 => v.kind == "snapshot",
+                        2 => v.kind.starts_with("old_"),
+                        _ => true,
+                    }
+            })
+            .map(|v| VersionRow {
+                id: v.id.as_str().into(),
+                kind: v.kind.as_str().into(),
+            })
+            .collect::<Vec<_>>(),
+    )));
 }
 fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     if view.revision == model.revision {
@@ -33,6 +57,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                     id: g.id.as_str().into(),
                     title: g.title.as_str().into(),
                     subtitle: g.subtitle.as_str().into(),
+                    icon: g.icon.as_str().into(),
                 })
                 .collect::<Vec<_>>(),
         )));
@@ -69,6 +94,19 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         ui.set_java_options(strings(java));
         ui.set_java_index(0);
         view.java_revision = model.java_revision;
+    }
+    if view.catalog_revision != model.catalog_revision {
+        filter_versions(ui, model);
+        if model.loader_key
+            == (
+                ui.get_install_version().to_string(),
+                ui.get_loader_kind().to_string(),
+            )
+        {
+            ui.set_loader_options(strings(model.loaders.clone()));
+            ui.set_loader_index(if model.loaders.is_empty() { -1 } else { 0 });
+        }
+        view.catalog_revision = model.catalog_revision;
     }
     let selected = model.selected_game();
     ui.set_selected_id(selected.map_or("", |g| g.id.as_str()).into());
@@ -155,6 +193,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Unexpected argument".into());
     }
     let ui = Launcher::new()?;
+    {
+        let weak = ui.as_weak();
+        ui.on_minimize(move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.window().set_minimized(true);
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        ui.on_maximize(move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.window().set_maximized(!ui.window().is_maximized());
+            }
+        });
+    }
     let glass = RefCell::new(glass::Glass::new()?);
     ui.global::<GlassAssets>()
         .on_tile(move |x, y, w, h, vw, vh| glass.borrow_mut().tile([x, y, w, h, vw, vh]));
@@ -162,6 +216,68 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let model = Rc::new(RefCell::new(Model::new(app)));
     let view = Rc::new(RefCell::new(View::default()));
     let os = windows_version();
+    {
+        let model = model.clone();
+        ui.on_load_versions(move || operation(&model, Model::catalog));
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_filter_versions(move || {
+            if let Some(ui) = weak.upgrade() {
+                filter_versions(&ui, &model.borrow());
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_pick_version(move |id| {
+            if let Some(ui) = weak.upgrade() {
+                if model.borrow().busy()
+                    || !model.borrow().catalog.iter().any(|v| v.id == id.as_str())
+                {
+                    return;
+                }
+                ui.set_install_version(id.clone());
+                ui.set_install_name(format!("{id}-vanilla").into());
+                ui.set_install_title(format!("{id}-vanilla").into());
+                ui.set_loader_kind("原版".into());
+                ui.set_loader_options(strings(vec![]));
+                ui.set_loader_index(-1);
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_pick_loader(move |kind| {
+            if let Some(ui) = weak.upgrade() {
+                if model.borrow().busy() {
+                    return;
+                }
+                ui.set_loader_kind(kind.clone());
+                ui.set_loader_options(strings(vec![]));
+                ui.set_loader_index(-1);
+                let name = format!(
+                    "{}-{}",
+                    ui.get_install_version(),
+                    if kind == "原版" {
+                        "vanilla".into()
+                    } else {
+                        kind.to_lowercase()
+                    }
+                );
+                ui.set_install_name(name.clone().into());
+                ui.set_install_title(name.into());
+                if kind != "原版" {
+                    operation(&model, |m| {
+                        m.loaders(ui.get_install_version().to_string(), kind.to_string())
+                    });
+                }
+            }
+        });
+    }
     {
         let model = model.clone();
         ui.on_refresh(move || operation(&model, Model::reload));
@@ -206,6 +322,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         ui.get_install_name().to_string(),
                         ui.get_budget_gib(),
                         os.clone(),
+                        ui.get_install_title().to_string(),
+                        ui.get_install_icon().to_string(),
+                        if ui.get_loader_kind() == "原版" {
+                            None
+                        } else {
+                            Some(ambrum::loader::Choice {
+                                kind: ui.get_loader_kind().to_string(),
+                                version: m
+                                    .loaders
+                                    .get(
+                                        usize::try_from(ui.get_loader_index())
+                                            .map_err(|_| "请选择加载器版本")?,
+                                    )
+                                    .ok_or("请选择加载器版本")?
+                                    .clone(),
+                            })
+                        },
+                        PathBuf::from(ui.get_java_path().as_str()),
                     )
                 });
             }

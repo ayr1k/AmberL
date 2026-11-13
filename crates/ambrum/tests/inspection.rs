@@ -207,3 +207,11 @@ fn java_8_and_modern_versions_keep_their_actual_architecture() {
     }
     assert!(ambrum::java::parse("openjdk version 21").is_err());
 }
+#[test]
+fn modern_neoforge_coordinate_is_identified_without_claiming_isolation() {
+    let f = Fixture::new();
+    f.profile("26.3", json!({"mainClass":"net.neoforged.fml.startup.Client","libraries":[{"name":"net.neoforged.fancymodloader:loader:12.0.12"}]}));
+    let scan = f.scan();
+    assert_eq!(scan.instances[0].loader, "NeoForge");
+    assert_eq!(scan.instances[0].isolation, Isolation::Unknown);
+}

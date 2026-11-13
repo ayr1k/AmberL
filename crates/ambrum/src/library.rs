@@ -364,6 +364,7 @@ impl Library {
                         ("org.quiltmc:quilt-loader:", "Quilt"),
                         ("net.minecraftforge:forge:", "Forge"),
                         ("net.neoforged:neoforge:", "NeoForge"),
+                        ("net.neoforged.fancymodloader:loader:", "NeoForge"),
                     ] {
                         if coordinate.starts_with(prefix) {
                             loaders.insert(loader);

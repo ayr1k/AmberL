@@ -14,6 +14,8 @@ pub mod java;
 pub mod launch;
 pub mod library;
 #[cfg(windows)]
+pub mod loader;
+#[cfg(windows)]
 pub mod manifest;
 pub mod paths;
 #[cfg(windows)]
