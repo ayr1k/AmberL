@@ -1,0 +1,6 @@
+/target/
+/artifacts/
+/local/
+*.log
+*.pdb
+
