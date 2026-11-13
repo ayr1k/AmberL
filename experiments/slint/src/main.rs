@@ -111,13 +111,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let model = model.clone();
         let weak = ui.as_weak();
         ui.on_scan(move || {
-            if let Some(ui) = weak.upgrade() {
-                if let Err(e) = model
+            if let Some(ui) = weak.upgrade()
+                && let Err(e) = model
                     .borrow_mut()
                     .scan(ui.get_library_path().as_str().into())
-                {
-                    ui.set_status(e.into());
-                }
+            {
+                ui.set_status(e.into());
             }
         });
     }
@@ -129,10 +128,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let model = model.clone();
         let weak = ui.as_weak();
         ui.on_filter(move |query| {
-            if let Err(e) = model.borrow_mut().filter(&query) {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_status(e.into());
-                }
+            if let Err(e) = model.borrow_mut().filter(&query)
+                && let Some(ui) = weak.upgrade()
+            {
+                ui.set_status(e.into());
             }
         });
     }
