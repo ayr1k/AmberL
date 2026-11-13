@@ -9,6 +9,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -22,9 +24,11 @@ jobs:
       - shell: pwsh
         run: ./scripts/test-resource-plan.ps1
       - shell: pwsh
+        run: ./scripts/test-install.ps1
+      - shell: pwsh
         run: ./scripts/package-probe.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: AmberL-native-probe-${{ github.sha }}
-          path: artifacts/*
+          name: AmberL-native-probe-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/*.zip
           if-no-files-found: error

@@ -184,7 +184,7 @@ impl Read for Response {
     }
 }
 
-pub(super) struct Hash {
+pub(crate) struct Hash {
     algorithm: BCRYPT_ALG_HANDLE,
     hash: BCRYPT_HASH_HANDLE,
     size: usize,

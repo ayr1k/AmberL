@@ -20,7 +20,7 @@ use windows_sys::Win32::{Storage::FileSystem::*, System::Com::CoCreateGuid};
 const LIMIT: u64 = 2 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-struct ObjectId {
+pub(crate) struct ObjectId {
     volume: u32,
     index: u64,
     created: u64,
@@ -48,7 +48,7 @@ pub(crate) fn options() -> OpenOptions {
 
 pub(crate) struct DirectoryGuard {
     pub(crate) root: PathBuf,
-    id: ObjectId,
+    pub(crate) id: ObjectId,
     _handles: Vec<File>,
 }
 impl DirectoryGuard {

@@ -12,6 +12,7 @@ Copy-Item target/release/amberl-native-probe.exe,target/release/amberl-inspect.e
 Copy-Item docs -Destination $packageRoot -Recurse
 Copy-Item scripts/test-download-network.ps1 -Destination $packageRoot
 Copy-Item scripts/test-resource-plan.ps1 -Destination $packageRoot
+Copy-Item scripts/test-install.ps1,scripts/test-install-network.ps1 -Destination $packageRoot
 $sourceArchive = Join-Path $packageRoot 'AmberL-source.zip'
 git -c core.autocrlf=false archive --format=zip "--output=$sourceArchive" HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot archive the exact source revision.' }

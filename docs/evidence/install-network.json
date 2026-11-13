@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "executable_sha256": "3ad59de0a8c00b1ddfddcf865a8f84325da1546b95fcdf78e7043cef4cb76d20",
+  "scope": "Actual Ambrum HTTPS, official metadata/resources, verified cache reuse and new-directory materialization; no login/game execution",
+  "versions": [
+    {
+      "version": "1.21.4",
+      "metadata_sha1": "87fcc1eec25874d12bca737d6579a247ce2d2746",
+      "verified_files": 4128,
+      "verified_bytes": 526105870,
+      "second_prepare_cache_hits": 4128,
+      "materialized_files": 4129,
+      "materialized_bytes": 526147716,
+      "extracted_native_files": 0,
+      "receipt_files_checked": 4130,
+      "official_client_sha1_verified": true,
+      "launch_verified": false
+    },
+    {
+      "version": "1.12.2",
+      "metadata_sha1": "832d95b9f40699d4961394dcf6cf549e65f15dc5",
+      "verified_files": 1328,
+      "verified_bytes": 181001390,
+      "second_prepare_cache_hits": 1328,
+      "materialized_files": 1340,
+      "materialized_bytes": 182877641,
+      "extracted_native_files": 11,
+      "receipt_files_checked": 1341,
+      "official_client_sha1_verified": true,
+      "launch_verified": false
+    }
+  ]
+}

@@ -4,7 +4,7 @@ A lightweight, carefully designed Minecraft game and multiplayer workstation.
 Ambrum is its UI-independent Rust core. **Early development: not a usable launcher yet.**
 
 轻量、精致、易用的 Minecraft 游戏与联机工作站。减少必须做的决定，保留必要选择。
-**当前是技术样机，不具备完整安装、登录、游戏启动或联机能力。**
+**当前是开发样机：支持原版新目录安装的命令行验证，尚不能登录、启动游戏或联机。**
 
 ## Current milestone / 当前进度
 
@@ -21,12 +21,16 @@ Ambrum is its UI-independent Rust core. **Early development: not a usable launch
   separate native archives, exact argument boundaries and conflicting-path rejection.
 - Batch Vanilla cache preparation: verified asset-index discovery, explicit byte budget,
   cross-resource deduplication, cancellation and retries that reuse verified cache files.
+- Official version discovery with bounded HTTPS metadata and catalog SHA-1 verification.
+- New isolated Vanilla directory installation from verified cache, bounded native ZIP
+  extraction, explicit disk budget and recoverable no-replacement directory commit.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
 The Windows UI is a **system-control comparison baseline**, not the final design and
 not a substitute for the Slint/WinUI selection experiment. No WebView or Node process.
-All game mutations, login, game/content download workflows and process supervision
-remain future work. A detected loader is **not** a claim of launch compatibility.
+Installation is available through the CLI only. Login, launch, the integrated installation
+UI, third-party content and process supervision remain future work. A detected loader
+is **not** a claim of launch compatibility.
 
 ## Try the development probe / 试用开发样机
 
@@ -38,7 +42,8 @@ Path replacement or damaged configuration produces an error and preserves the ol
 
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
-当前包是免安装技术样机，不能登录、安装和启动游戏或联机；外观不是最终设计。
+当前包是免安装开发样机；原版安装验证使用命令行，不能登录、启动游戏或联机。
+原生窗口仍是扫描／登记基线，外观不是最终设计。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
 For isolated testing, create an empty app-data directory and pass
@@ -53,10 +58,11 @@ OS call returns on its network timeout. Retry explicitly with the same descripto
 Expected hashes must come from trusted provider metadata; SHA-1 compatibility is not
 a signature/authenticity guarantee. No bearer credentials are accepted by this downloader.
 The package includes `test-download-network.ps1`, which fetches a pinned public license
-and checks cache reuse. This host's live attempt was blocked by DNS (Windows 12007).
+and checks cache reuse. The resumed Windows test passed actual HTTPS and cache reuse;
+the earlier DNS failure is retained only as history in the validation record.
 
 新增下载核心与命令行测试入口：暂存、取消、失败重试、大小和哈希校验、缓存复用。
-尚未接入游戏安装或内容搜索界面；本机真实网络请求仍因 DNS 解析失败而未通过。
+尚未接入游戏安装或内容搜索界面；本机真实 HTTPS、校验及缓存复用现已通过。
 
 Metadata planning (Windows x64, no network or game writes):
 `amberl-inspect plan-vanilla <metadata.json> <windows-os-version>` and
@@ -75,10 +81,33 @@ The budget includes cache hits; discovering the complete plan may require downlo
 asset index first. Failures retain completed cache objects for a verified retry. The task is
 sequential, and success means cached resources, not an installed or launchable game.
 `test-resource-plan.ps1` tests the packaged CLI with tiny synthetic metadata and seeded
-cache files without a network request. Live HTTPS has a separate test script and remains blocked.
+cache files without a network request. Live HTTPS has separate tests.
 
 新增批量缓存准备：先校验索引，再检查总量上限，支持去重、取消与失败后重试。
 只写 AmberL 缓存，不安装或修改游戏；测试使用合成数据，不等同于联网验收。
+
+## New-directory installation / 新目录安装验证
+
+Use separate existing empty directories for app data and an installation parent.
+`resolve-vanilla <app-directory> <version>` fetches the official catalog and verifies
+the selected metadata. Use its returned `metadata_path` with `prepare-vanilla`, then:
+
+```text
+amberl-inspect install-vanilla <app-directory> <metadata.json> <windows-os-version> <install-parent> <new-name> <max-bytes>
+amberl-inspect recover-install <install-parent> <operation-id>
+```
+
+The installer creates a **new** isolated directory; an existing destination is always
+rejected. It copies pinned, reverified resources rather than linking the cache. The
+budget counts every materialized copy, metadata and expanded natives. An interrupted
+operation retains its stage and reports its ID; recovery commits only complete,
+reverified stages. Incomplete stages are preserved and a new attempt can reuse cache.
+Installation success is not game launch or account acceptance.
+
+新目录安装使用独立暂存、真实目录锁、文件复验和不覆盖的目录提交；默认添加外部库
+仍为只读。损坏／不完整暂存不会自动删除或当作可运行实例。详见
+[安装与恢复边界](docs/INSTALLATION.md)。`test-install.ps1` 使用合成输入；
+`test-install-network.ps1` 才会通过 Ambrum 实际下载官方资源并验证安装副本。
 
 ## Build / 构建
 
@@ -103,6 +132,7 @@ future write operations. Do not import personal tokens, raw logs or caches into 
 - [Architecture and decisions / 架构与决策](docs/ARCHITECTURE.md)
 - [Compatibility and evidence / 兼容范围与证据](docs/COMPATIBILITY.md)
 - [Validation record / 验证记录](docs/VALIDATION.md)
+- [Installation and recovery / 安装与恢复](docs/INSTALLATION.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 Source: MPL-2.0. AMBER reference baseline:

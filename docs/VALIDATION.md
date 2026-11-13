@@ -38,7 +38,7 @@ acceptance from compilation, synthetic inspection or a visible launcher window.
   the available connector; it has no repository-creation action. No remote upload or PR
   is claimed. The local branch/commit and development ZIP are the current delivery.
 
-## Remaining targeted checks
+## Remaining targeted checks at the initial checkpoint (historical)
 - Slint/WinUI comparable UI samples and license decision once dependencies are accessible.
 - Real Java 8, authentication and visible Minecraft launch; native tray/process lifecycle.
 - Rendered UI, Chinese input, accessibility, per-monitor DPI and AMBER resource baseline.
@@ -119,9 +119,65 @@ every archived file against its Git blob SHA. The first resumed package check ex
 CRLF-only differences caused by the host setting; the corrected package preserves exact
 committed source bytes. Existing prior packages are retained, not overwritten.
 
+## Resumed Windows checkpoint (2026-11-12, America/New_York)
+
+The original Windows repository was available, clean and exactly matched local commit
+`812872f34a8ce21e6ea2f7cdef296e1eef15fd8d` / tree
+`60e16b6665d205f441d3915da06c3c08456733fc`. Rust 1.99.1 MSVC is usable. All original
+45 tests passed in the normal Windows execution context. Restricted execution first
+denied ancestor directory handles; that environment failure is not recorded as a product
+regression. No unrelated AMBER test suite or original game/account data was used.
+
+- Actual AmberL WinHTTP HTTPS of the pinned 16,726-byte LICENSE passed its expected
+  SHA-256, then returned a verified cache hit. crates.io lookup/dependency retrieval works.
+- Remote inspection found only the unchanged initial main, no previous PR. The ayr1k
+  connector's create_blob/create_pull_request still returned 403, separately from network
+  reachability. Normal Git with the verified ayr1k identity successfully uploaded source.
+- Integration commit `c581c20ca744a8bab2fe0dc13c1e9db708a19872` parents remote main and
+  the original local history. Its source tree is exactly the recovered tree above. Neither
+  history was rewritten. Main remains `b6abee821f2354014e22b289f9e1b340bbd0c159`.
+- [Draft PR #1](https://github.com/ayr1k/AmberL/pull/1) exists. The initial
+  [Windows run](https://github.com/ayr1k/AmberL/actions/runs/43359836356) passed tests,
+  strict Clippy, release build, native-control automation, CLI resource-plan smoke and
+  package publication. Subsequent PR revisions/artifacts identify their exact tested SHA.
+
+## Continued milestone: new-directory installation
+
+Targeted catalog/installation tests cover official metadata ID/hash/origin and cancellation;
+new directory copy isolation; budgets; cancellation/incomplete stage retention; complete
+stage reopen/recovery; corrupt/extra/hardlinked/replaced/unknown-schema stages; competing
+parent locks; pre-commit destination conflicts; active cache writers; native path traversal,
+case and file/directory collisions, symlinks, CRC corruption and a real Windows junction;
+Deflate extraction; native expansion budget; virtual/resource asset copies. Existing
+download/preparation regressions were rerun because the cache gained a pinned-file reader.
+
+`scripts/test-install-network.ps1` used the actual release CLI and a new disposable
+app/cache + installation parent. No other downloader seeded these resources. The official
+catalog, selected metadata, libraries, asset index and assets were requested through Ambrum.
+Each installed receipt was independently rehashed using PowerShell; client JAR SHA-1 was
+also checked against its official descriptor. The second preparation reused every resource.
+
+| Version | Verified cache objects | Planned cache bytes | Second preparation hits | Materialized files | Materialized bytes | Extracted native files |
+|---|---:|---:|---:|---:|---:|---:|
+| 1.21.4 | 4,128 | 526,105,870 | 4,128 | 4,129 | 526,147,716 | 0 |
+| 1.12.2 | 1,328 | 181,001,390 | 1,328 | 1,340 | 182,877,641 | 11 |
+
+Metadata SHA-1: `87fcc1eec25874d12bca737d6579a247ce2d2746` (1.21.4),
+`832d95b9f40699d4961394dcf6cf549e65f15dc5` (1.12.2). The independent receipt check
+also includes one pending journal per instance (4,130 / 1,341 checked files). See
+`docs/evidence/install-network.json` for the tested executable hash and counts. That hash
+identifies the local live-test executable; a separate CI build may have a different hash.
+The packaged synthetic CLI check covers a Chinese/space-containing target name, metadata
+preservation and rejecting an existing installation without modifying it.
+
+Recovery tests simulate cancellation and reopened handles; they are not a claim of
+power-loss durability or a full process-kill fault matrix. Native extraction is not evidence
+of Java 8 or an old-game window. Both live results explicitly set `launch_verified:false`.
+
 ## Limits
-No Minecraft authentication, visible game/world, installation, content download UI, backup,
-recovery, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
+No Minecraft authentication, visible game/world, existing-instance update, installation UI,
+general backup/restore, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
+New-directory materialization and complete-stage recovery are the only new write capabilities.
 Slint/WinUI selection, full Chinese IME/reader/DPI matrix and AMBER resource comparison
 remain pending. Probe footprint cannot predict completed product footprint.
 

@@ -12,3 +12,4 @@ regex = "1.13.1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
+zip = { version = "9.5.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }

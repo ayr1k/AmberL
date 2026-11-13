@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
-//! UI-independent library inspection. This milestone never modifies a game library.
+//! UI-independent inspection, resource preparation and explicit new-directory installation.
+//! Attaching an external game library remains read-only; no login or game execution yet.
+#[cfg(windows)]
+pub mod catalog;
 #[cfg(windows)]
 pub mod download;
+#[cfg(windows)]
+pub mod install;
 pub mod java;
 pub mod library;
 #[cfg(windows)]
@@ -12,6 +17,8 @@ pub mod prepare;
 #[cfg(windows)]
 pub mod registry;
 pub mod task;
+#[cfg(windows)]
+mod transaction;
 
 /// Public application configuration explicitly shared with AMBER. Never a credential.
 pub const MICROSOFT_CLIENT_ID: &str = "ab7cf49a-fea7-432d-8ce8-beb922eb554e";

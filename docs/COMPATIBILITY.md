@@ -42,6 +42,16 @@ No extraction, installation, argument substitution, credential handling or launc
 只读计划支持原版描述与资源索引；实际安装、启动及第三方加载器兼容仍未验收。
 
 ## Stable matrix to populate
+
+### New-directory CLI installation
+
+Standalone Vanilla plans can now materialize verified cache resources into a new isolated
+directory, including supported legacy native ZIP entries and virtual/resource asset copies.
+No existing AMBER, PCL, HMCL or official-launcher library is adopted for mutation. Their
+read-only rows above retain their previous boundaries. Installed metadata alone does not
+supply isolation evidence to the generic external-library scanner or prove game readiness.
+Unknown Java requirements remain unknown; the installer does not select or execute Java.
+See INSTALLATION.md and the dated validation checkpoint for precise tested versions/limits.
 Each evidence row must pin layout sample, Minecraft/loader version, isolation mode,
 Java/OS/architecture and source revision. Separate columns: identify / launch / install /
 content edit / component edit / recycle / backup restore. Use passed / limited /

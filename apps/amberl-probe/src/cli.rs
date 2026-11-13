@@ -16,7 +16,16 @@ fn main() {
         [command, index] if command == "plan-assets" => plan_assets(Path::new(index)),
         #[cfg(windows)]
         [command, directory, metadata, os_version, max_bytes] if command == "prepare-vanilla" => prepare(Path::new(directory), Path::new(metadata), os_version.to_str(), max_bytes.to_str()),
-        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json> | prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes>\nDeveloper probe. Writes only explicit app configuration/cache, never game files. Does not install or launch Minecraft.".into()),
+        #[cfg(windows)]
+        [command, directory, version] if command == "resolve-vanilla" => resolve(Path::new(directory), version.to_str()),
+        #[cfg(windows)]
+        [command, directory, metadata, os_version, parent, name, max_bytes] if command == "install-vanilla" => install(Path::new(directory), Path::new(metadata), os_version.to_str(), Path::new(parent), name.to_str(), max_bytes.to_str()),
+        #[cfg(windows)]
+        [command, parent, operation] if command == "recover-install" => cancellable(|cancel| {
+            let path = ambrum::install::recover(Path::new(parent), operation.to_str().ok_or("Invalid operation ID")?, cancel)?;
+            serde_json::to_string_pretty(&serde_json::json!({"game_directory":path,"launch_verified":false})).map_err(|e| e.to_string())
+        }),
+        _ => Err("Usage: amberl-inspect scan <library> | java <java.exe> | libraries <app-directory> [add <library> | scan <id> | remove <id>] | fetch <app-directory> <https-url> <sha1:hex|sha256:hex> <bytes> | plan-vanilla <metadata.json> <windows-os-version> | plan-assets <asset-index.json> | prepare-vanilla <app-directory> <metadata.json> <windows-os-version> <max-bytes> | resolve-vanilla <app-directory> <version> | install-vanilla <app-directory> <metadata.json> <windows-os-version> <install-parent> <new-name> <max-bytes> | recover-install <install-parent> <operation-id>\nDeveloper probe. Installation creates new isolated directories only. Does not authenticate or launch Minecraft.".into()),
     };
     match result {
         Ok(output) => println!("{output}"),
@@ -25,6 +34,54 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+#[cfg(windows)]
+fn resolve(directory: &Path, version: Option<&str>) -> ambrum::Result<String> {
+    let result = cancellable(|cancel| {
+        ambrum::catalog::resolve(
+            &ambrum::download::Cache::open(directory)?,
+            version.ok_or("Invalid version ID")?,
+            &ambrum::download::Https,
+            cancel,
+        )
+    })?;
+    serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn install(
+    directory: &Path,
+    metadata: &Path,
+    os_version: Option<&str>,
+    parent: &Path,
+    name: Option<&str>,
+    max_bytes: Option<&str>,
+) -> ambrum::Result<String> {
+    let path = ambrum::paths::ordinary(metadata)?;
+    let value = ambrum::paths::json(path.parent().ok_or("Missing metadata parent")?, &path)?;
+    let budget = max_bytes
+        .and_then(|n| n.parse::<u64>().ok())
+        .filter(|n| *n > 0)
+        .ok_or("Positive byte budget required")?;
+    let result = cancellable(|cancel| {
+        ambrum::install::vanilla(
+            &ambrum::download::Cache::open(directory)?,
+            &value,
+            &ambrum::manifest::Platform::windows_x64(os_version.ok_or("Invalid Windows version")?),
+            parent,
+            name.ok_or("Invalid instance name")?,
+            budget,
+            cancel,
+            |p| {
+                eprintln!(
+                    "{} {:?}: {}/{} files",
+                    p.operation, p.phase, p.files_written, p.total_files
+                );
+            },
+        )
+    })?;
+    serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
 }
 
 #[cfg(windows)]

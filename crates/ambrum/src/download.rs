@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Verified app-cache downloads. No game-directory writes, archive extraction or auth.
-mod windows;
+pub(crate) mod windows;
 use crate::{
     Result,
     registry::{DirectoryGuard, info, new_id, options},
@@ -98,6 +98,54 @@ pub struct Cache {
     directory: DirectoryGuard,
 }
 impl Cache {
+    pub(crate) fn root(&self) -> &Path {
+        &self.directory.root
+    }
+
+    /// Pin a resource against concurrent writes/deletion and verify its actual bytes.
+    /// The returned handle, not a remembered cache pathname, is the copy source.
+    pub(crate) fn verified_file(
+        &self,
+        artifact: &Artifact,
+        cancel: &Cancellation,
+    ) -> Result<fs::File> {
+        use std::io::{Seek, SeekFrom};
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+        cancel.check()?;
+        let mut file = options()
+            .share_mode(FILE_SHARE_READ)
+            .open(self.directory.root.join(artifact.key()?))
+            .map_err(|_| "Cache resource missing or busy; prepare it first")?;
+        let metadata = file.metadata().map_err(|e| e.to_string())?;
+        if info(&file)?.nNumberOfLinks != 1
+            || !metadata.is_file()
+            || metadata.len() != artifact.size
+        {
+            return Err("Cache resource size/type mismatch".into());
+        }
+        let mut hash = Hash::new(artifact.algorithm)?;
+        let mut buffer = [0; 65536];
+        let mut total = 0;
+        loop {
+            cancel.check()?;
+            let n = file.read(&mut buffer).map_err(|_| "Cache read failed")?;
+            if n == 0 {
+                break;
+            }
+            total += n as u64;
+            if total > artifact.size {
+                return Err("Cache resource size changed".into());
+            }
+            hash.update(&buffer[..n])?;
+        }
+        if total != artifact.size || !hash.finish()?.eq_ignore_ascii_case(&artifact.digest) {
+            return Err("Cache checksum mismatch; prepare the resource again".into());
+        }
+        file.seek(SeekFrom::Start(0))
+            .map_err(|_| "Cannot rewind cache resource")?;
+        Ok(file)
+    }
     /// Read a small cached metadata object with a fresh digest check while denying
     /// concurrent writes/deletion. A path returned by fetch is not a trusted snapshot.
     pub fn read_json(

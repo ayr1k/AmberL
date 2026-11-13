@@ -43,6 +43,12 @@ isolation must be resolved before launch/mutation. No artificial splash delays.
 The initial read-only native probe implements part of B, not completion of B/C.
 No calendar estimate is made before UI/dependency feasibility and first measurements.
 
+Resumed stage B work adds actual official HTTPS discovery, a new-directory Vanilla
+installation transaction and bounded native extraction/recovery. Draft PR #1 and Windows
+CI make the prototype reviewable and downloadable. Slint/WinUI comparison, authentication,
+OS token storage, real Java/game windows and server process lifecycle remain open gates;
+this installation slice does not complete B or C.
+
 ## User task comparison / 体验对比
 First use, add existing library, install a game, install a mod, create/join multiplayer.
 Measure success, elapsed time, incorrect actions, help requests and feedback; alternate

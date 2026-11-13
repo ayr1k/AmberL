@@ -26,7 +26,11 @@
 - `ambrum::download` (Windows cache adapter): bounded streaming, cancellation, progress,
   hash-keyed locks, verified cache reuse, same-directory commit. HTTP is an injected
   `Transport`; Windows WinHTTP and CNG implement TLS and hashes without custom protocols.
-- `amberl-inspect`: independent CLI for reproducible inspection.
+- `ambrum::catalog` (Windows): bounded official version discovery and metadata digest/ID checks.
+- `ambrum::install` + private `transaction` (Windows): fresh isolated Vanilla directories,
+  verified copies, bounded native extraction, parent lock, staged identity/receipt and
+  no-replacement rename through a held handle. See INSTALLATION.md for recovery limits.
+- `amberl-inspect`: independent CLI for reproducible inspection and explicit installation.
 - `ambrum::manifest` (currently Windows): pure Vanilla/resource plans with ordered
   platform/feature rules and bounded regexes. No authentication, network, writes or execution.
 - `ambrum::prepare` (Windows): two-phase Vanilla cache preparation, index first then
@@ -39,7 +43,9 @@ Registry scans keep non-delete-sharing handles to the directory and its ancestor
 All paths are checked for reparses before use; this conservative implementation can reject
 otherwise legitimate linked libraries. Actual game contents are still read-only and are
 not locked against external launchers. Deserialization does not authorize game mutations.
-Win32 unsafe calls live in the UI and Windows registry adapters. No game writes/launches exist.
+Win32 unsafe calls live in UI/platform adapters. The separate installation API writes only
+new explicitly requested directories; registered external-library inspection remains read-only.
+No game launch exists.
 
 The registry holds a non-delete-sharing lock file with an exclusive OS lock; concurrent
 writers fail fast. Updates write/sync a unique new file before same-directory replacement.
@@ -96,9 +102,10 @@ virtual lists, log backpressure, rendering/backend cost and clean-machine deploy
 Reject unusable input/accessibility even if package size is attractive.
 
 ## Next concrete slice
-Resolve dependency access and GitHub delivery; compare UI samples. In parallel with UI
-work, extend identity/transactions to actual game resources, then authenticated
-Vanilla launch from a disposable fixture. Verify Java 8 and modern Java plus actual
-visible menus/worlds before scaling out loaders. Auth and OS credential storage belong
-early in the vertical slice. Server lifecycle feasibility also precedes full local polish.
+Dependency access and initial GitHub/CI delivery are now working through normal Git.
+New-directory materialization and complete-stage recovery extend the earlier cache slice;
+they do not provide updates to existing/shared game directories. Next: comparable UI samples,
+auth with OS credential storage, Java selection and actual Vanilla launch in disposable
+directories. Verify Java 8/modern Java and visible menus/worlds before scaling out loaders.
+Server lifecycle feasibility also precedes full local polish. Stage B remains incomplete.
 
