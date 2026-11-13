@@ -23,8 +23,10 @@ New-directory installation uses zip 9.5.1 (MIT), with only stored/Deflate readin
 enabled through flate2 (MIT OR Apache-2.0) and zlib-rs (Zlib). No home-grown ZIP or
 compression implementation. constant_time_eq offers CC0-1.0 OR MIT-0 OR Apache-2.0;
 the complete packaged notices preserve these alternatives and all transitive licenses.
-The expanded lock graph includes their transitive dependencies; exact resolved
-versions and original license texts are included by package-probe.ps1. Windows
+The expanded lock graph includes their transitive dependencies; exact build-target
+versions and original license texts are included by package-probe.ps1. Dependencies
+for other targets (for example UEFI or WebAssembly) are not part of this Windows binary.
+Windows
 SetFileInformationByHandle performs the no-replacement directory commit.
 Official Minecraft metadata/resources are downloaded only into a user's explicitly
 chosen development cache/install directory, never redistributed in the probe ZIP.

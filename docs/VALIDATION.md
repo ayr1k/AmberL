@@ -174,6 +174,11 @@ Recovery tests simulate cancellation and reopened handles; they are not a claim 
 power-loss durability or a full process-kill fault matrix. Native extraction is not evidence
 of Java 8 or an old-game window. Both live results explicitly set `launch_verified:false`.
 
+Packaging the expanded dependency graph exposed `r-efi` without bundled license files.
+It is a UEFI-only dependency, not linked into the Windows binary. Packaging now uses
+Cargo's filtered build-target resolve graph and includes notices for every reachable
+Windows dependency, retaining strict failure for a missing notice in that graph.
+
 ## Limits
 No Minecraft authentication, visible game/world, existing-instance update, installation UI,
 general backup/restore, FRP, cross-device play, installer/upgrade or non-Windows UI acceptance.
