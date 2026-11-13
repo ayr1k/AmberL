@@ -46,7 +46,8 @@ otherwise legitimate linked libraries. Actual game contents are still read-only 
 not locked against external launchers. Deserialization does not authorize game mutations.
 Win32 unsafe calls live in UI/platform adapters. The separate installation API writes only
 new explicitly requested directories; registered external-library inspection remains read-only.
-No game launch exists.
+Owned Vanilla installation launch now exists through the authenticated CLI; external
+library inspection still grants no launch or mutation authority.
 
 The registry holds a non-delete-sharing lock file with an exclusive OS lock; concurrent
 writers fail fast. Updates write/sync a unique new file before same-directory replacement.
@@ -93,7 +94,10 @@ not be represented as completing that comparison.
 Slint 1.18.1 documentation was inspected. GPLv3 / Royalty-free / commercial choices
 need a pinned dependency/license decision. Royalty-free 2.0 requires attribution and
 restricts exposing Slint APIs; do not design third-party APIs around UI framework types.
-No Slint dependency or license acceptance is part of this initial source.
+The isolated comparison sample now pins Slint 1.18.1 with its desktop Royalty-free 2.0
+option and AboutSlint attribution. The WinUI host pins App SDK components 2.6.5.
+Both share `amberl-ui-model`; WinUI uses an in-process Rust bridge. See
+[comparison evidence and outstanding gates](UI-COMPARISON.md).
 References: https://slint.dev/agreements/slint-royalty-free-license.pdf and
 https://learn.microsoft.com/en-us/windows/apps/winui/winui3/ .
 
@@ -116,7 +120,7 @@ Process creation is reported separately from unknown readiness; output is bounde
 See [authentication/session contract](AUTH-LAUNCH.md) for threat boundaries and limitations.
 
 ## Next concrete slice
-Comparable Slint/WinUI samples, runtime installation/per-instance preferences, Java 8/old
+Finish Slint/WinUI input/accessibility/DPI acceptance, runtime installation/per-instance preferences, Java 8/old
 game-window acceptance and server lifecycle remain Stage B gates. Integrated account/launch
 UI follows the framework experiment. Existing/shared library modification, loaders and
 multiplayer are separate capabilities. Stage B remains incomplete.

@@ -1,6 +1,7 @@
 /target/
 /artifacts/
 /local/
+/experiments/slint/target/
 *.log
 *.pdb
 

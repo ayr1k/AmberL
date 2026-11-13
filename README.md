@@ -28,8 +28,10 @@ Ambrum is its UI-independent Rust core. **Early development: authenticated Vanil
 - Authenticated Vanilla sessions with pinned installed resources, separate arguments, own-process exit and redacted output.
 - Public Microsoft application settings match AMBER; no account credentials are imported.
 
-The Windows UI is a **system-control comparison baseline**, not the final design and
-not a substitute for the Slint/WinUI selection experiment. No WebView or Node process.
+The original Windows UI remains a **system-control comparison baseline**. Separate
+[Slint and WinUI 3 samples](docs/UI-COMPARISON.md) now exercise the same Rust model;
+input/accessibility/DPI acceptance remains open. No framework selection or final design
+is implied. No WebView or Node process.
 Installation and authenticated launch are available through the CLI only. The integrated
 UI, third-party content and full process/exit UX remain future work. A detected loader
 is **not** a claim of launch compatibility.

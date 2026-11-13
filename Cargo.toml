@@ -1,5 +1,6 @@
 [workspace]
-members = ["crates/ambrum", "apps/amberl-probe"]
+members = ["crates/ambrum", "crates/amberl-ui-model", "crates/amberl-ui-bridge", "apps/amberl-probe"]
+exclude = ["experiments/slint"]
 resolver = "2"
 
 [workspace.package]

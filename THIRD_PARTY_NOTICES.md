@@ -36,3 +36,12 @@ and zeroize/zeroize_derive (MIT OR Apache-2.0). Windows DPAPI provides current-u
 credential encryption. No separate authentication broker, browser runtime or crypto
 service is bundled. Exact locked versions and original license texts ship in the package.
 
+The separate UI comparison package adds Slint 1.18.1 under its desktop Royalty-free
+2.0 option, with the standard AboutSlint widget accessible from About. Original Slint
+and all resolved Windows dependency license texts are included. Framework types are
+not exposed through the core/bridge API. See docs/UI-COMPARISON.md for scope.
+The C++/WinRT host uses locked Microsoft Windows App SDK 2.6.5 components and SDK
+runtime assets, with original Microsoft notices. WebView2 metadata/loader is a build
+dependency of WinUI projections, not an embedded browser or instantiated WebView.
+Windows and the Microsoft Visual C++ x64 runtime remain host prerequisites.
+

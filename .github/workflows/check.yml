@@ -34,3 +34,21 @@ jobs:
           name: AmberL-native-probe-${{ github.event.pull_request.head.sha || github.sha }}
           path: artifacts/*.zip
           if-no-files-found: error
+  ui-comparison:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: rustup component add rust-docs
+      - run: cargo fmt --manifest-path experiments/slint/Cargo.toml --check
+      - shell: pwsh
+        run: ./scripts/package-ui-comparison.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AmberL-ui-comparison-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/AmberL-ui-comparison-*.zip
+          if-no-files-found: error

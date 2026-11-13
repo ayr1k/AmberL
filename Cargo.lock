@@ -21,6 +21,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "amberl-ui-bridge"
+version = "0.1.0-dev.1"
+dependencies = [
+ "amberl-ui-model",
+ "serde_json",
+]
+
+[[package]]
+name = "amberl-ui-model"
+version = "0.1.0-dev.1"
+dependencies = [
+ "ambrum",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ambrum"
 version = "0.1.0-dev.1"
 dependencies = [
