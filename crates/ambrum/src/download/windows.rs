@@ -101,11 +101,17 @@ impl Transport for Https {
         request(url, false)
     }
 }
-/// One anonymous redirect for pinned EasyTier release bytes, never for account traffic.
+/// One anonymous redirect for pinned networking release bytes, never for account traffic.
 pub(crate) struct GithubRelease;
 impl Transport for GithubRelease {
     fn open(&self, url: &str) -> Result<Box<dyn Read>> {
-        if !url.starts_with("https://github.com/EasyTier/EasyTier/releases/download/") {
+        if ![
+            "https://github.com/EasyTier/EasyTier/releases/download/",
+            "https://github.com/fatedier/frp/releases/download/",
+        ]
+        .iter()
+        .any(|prefix| url.starts_with(prefix))
+        {
             return Err("Unsupported component origin".into());
         }
         request(url, true)
@@ -122,7 +128,7 @@ fn request(url: &str, github_redirect: bool) -> Result<Box<dyn Read>> {
     let url = Https::parse(url)?;
     unsafe {
         let session = Handle::new(WinHttpOpen(
-            wide("AmberL/0.1 Ambrum").as_ptr(),
+            wide("AmberL/0.1 (https://github.com/ayr1k/AmberL)").as_ptr(),
             WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
             null(),
             null(),

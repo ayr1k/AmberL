@@ -26,6 +26,15 @@ impl<T: Serialize + DeserializeOwned + Default> Document<T> {
         if directory.root.join("versions").exists() || directory.root.join("instances").exists() {
             return Err("App directory cannot be a game library".into());
         }
+        Self::open_guarded(directory, name)
+    }
+    /// Caller has established ownership of this directory and holds its operation lock.
+    /// Server runtimes may legitimately create a `versions` directory inside their root.
+    pub(crate) fn open_owned(directory: &DirectoryGuard, name: &str) -> Result<Self> {
+        Self::open_guarded(DirectoryGuard::open(&directory.root)?, name)
+    }
+    fn open_guarded(directory: DirectoryGuard, name: &str) -> Result<Self> {
+        crate::paths::name(name)?;
         let lock = options()
             .write(true)
             .create(true)

@@ -5,6 +5,19 @@ use crate::registry::{DirectoryGuard, info, options};
 use std::{fs, io::Write, os::windows::fs::OpenOptionsExt};
 use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
 mod installer;
+mod paper;
+pub fn versions(
+    game: &str,
+    kind: &str,
+    net: &impl Transport,
+    c: &Cancellation,
+) -> Result<Vec<String>> {
+    if kind == "Paper" {
+        paper::versions(game, net, c)
+    } else {
+        super::versions(game, kind, net, c)
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -38,7 +51,12 @@ fn entry(kind: &str) -> Result<&'static str> {
 impl Runtime {
     pub fn validate(&self, game: &str) -> Result<()> {
         segment(&self.choice.version)?;
-        let main = if matches!(self.choice.kind.as_str(), "Forge" | "NeoForge") {
+        let main = if self.choice.kind == "Paper" {
+            if self.files.len() != 1 || self.files[0].path != "paper.jar" {
+                return Err("Invalid Paper file set".into());
+            }
+            "paper.jar".into()
+        } else if matches!(self.choice.kind.as_str(), "Forge" | "NeoForge") {
             installer::argument_file(&self.choice)?
         } else {
             entry(&self.choice.kind)?.into()
@@ -55,13 +73,18 @@ impl Runtime {
         for f in &self.files {
             paths::name(&self.game)?;
             crate::manifest::relative_path(&f.path)?;
-            if !f.path.starts_with("libraries/")
+            if !(f.path.starts_with("libraries/")
+                || self.choice.kind == "Paper" && f.path == "paper.jar")
                 || f.path.contains([';', '\n', '\r'])
                 || !seen.insert(f.path.to_ascii_lowercase())
             {
                 return Err("Invalid server loader path".into());
             }
-            origin(&f.artifact.url)?;
+            if self.choice.kind == "Paper" {
+                paper::validate(&f.artifact, game, &self.choice.version)?;
+            } else {
+                origin(&f.artifact.url)?;
+            }
             f.artifact.validate()?;
             bytes = bytes
                 .checked_add(f.artifact.size)
@@ -114,6 +137,9 @@ impl Runtime {
             .collect()
     }
     pub fn arguments(&self) -> Vec<String> {
+        if self.choice.kind == "Paper" {
+            return vec!["-jar".into(), "paper.jar".into()];
+        }
         if matches!(self.choice.kind.as_str(), "Forge" | "NeoForge") {
             return vec![format!("@{}", self.main)];
         }
@@ -146,6 +172,9 @@ pub fn install(
     let game = base["id"].as_str().ok_or("Missing server game identity")?;
     if !versions(game, &choice.kind, &net, cancel)?.contains(&choice.version) {
         return Err("请选择当前游戏兼容的服务端加载器版本".into());
+    }
+    if choice.kind == "Paper" {
+        return paper::install(cache, root, game, choice, cancel);
     }
     if matches!(choice.kind.as_str(), "Forge" | "NeoForge") {
         return installer::install(

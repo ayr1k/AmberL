@@ -29,6 +29,7 @@ struct View {
     content_plan: String,
     configuration_key: (String, String),
     configuration_revision: u64,
+    frp_revision: u64,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
@@ -64,6 +65,13 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     }
     if view.content_revision != model.content.revision {
         let c = &model.content;
+        ui.set_content_server(c.context.as_ref().is_some_and(|c| c.server));
+        ui.set_content_kind_index(
+            ["mod", "resourcepack", "shader", "plugin"]
+                .iter()
+                .position(|k| *k == c.kind)
+                .unwrap_or(0) as i32,
+        );
         let projects = c.projects.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
         let versions = c.versions.iter().map(|v| v.id.clone()).collect::<Vec<_>>();
         let groups = c.groups.iter().map(|g| g.id.clone()).collect::<Vec<_>>();
@@ -140,6 +148,18 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     }
     if view.network_revision != model.network.revision {
         let n = &model.network;
+        ui.set_frp_active(n.frp_active());
+        ui.set_frp_ready(n.frp_component);
+        ui.set_frp_status(n.frp_status.as_str().into());
+        if n.frp_revision != view.frp_revision {
+            if let Some(c) = &n.frp_config {
+                ui.set_frp_server(c.server.text().into());
+                ui.set_frp_certificate(c.certificate.to_string_lossy().as_ref().into());
+                ui.set_frp_local_port(c.local_port.into());
+                ui.set_frp_remote_port(c.remote_port.into());
+            }
+            view.frp_revision = n.frp_revision;
+        }
         let config = n
             .configuration
             .as_ref()
@@ -354,7 +374,7 @@ fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
         }};
     }
     action!(on_search_content, |u: &Launcher, m: &mut Model| {
-        let kind = *["mod", "resourcepack", "shader"]
+        let kind = *["mod", "resourcepack", "shader", "plugin"]
             .get(usize::try_from(u.get_content_kind_index()).map_err(|_| "请选择内容类型")?)
             .ok_or("请选择内容类型")?;
         m.search_content(kind.into(), u.get_content_query().to_string())
@@ -421,6 +441,39 @@ fn network_callbacks(ui: &Launcher, model: &Rc<RefCell<Model>>) {
     action!(
         on_refresh_servers,
         |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.reload()
+    );
+    action!(
+        on_load_frp,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.load_frp()
+    );
+    action!(
+        on_install_frp,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.install_frp()
+    );
+    action!(
+        on_stop_frp,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            n.stop_frp();
+            Ok(())
+        }
+    );
+    action!(
+        on_start_frp,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            let token = u.get_frp_token().to_string();
+            u.set_frp_token("".into());
+            n.start_frp(
+                ambrum::multiplayer::frp::Config {
+                    server: ambrum::multiplayer::Address::parse(u.get_frp_server().as_str())?,
+                    local_port: u16::try_from(u.get_frp_local_port())
+                        .map_err(|_| "无效本地端口")?,
+                    remote_port: u16::try_from(u.get_frp_remote_port())
+                        .map_err(|_| "无效节点端口")?,
+                    certificate: u.get_frp_certificate().as_str().into(),
+                },
+                token,
+            )
+        }
     );
     action!(
         on_install_network,

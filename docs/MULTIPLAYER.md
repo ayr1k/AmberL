@@ -7,7 +7,7 @@ This build implements a real Windows x64 vertical slice, not completion of Stage
 
 1. Open **联机 → 创建服务端**, load the official version list, choose a release,
    name and port, read the Minecraft EULA and explicitly accept it. This creates a
-   new Vanilla, Fabric, Quilt, modern Forge or NeoForge server under AmberL's own
+   new Vanilla, Fabric, Quilt, modern Forge/NeoForge or Paper server under AmberL's own
    `servers/<id>` directory. Loader installation also needs compatible Java. No world is imported.
 2. In **服务端**, refresh/select that server, explicitly choose compatible `java.exe`
    and memory, then start. **控制台** shows bounded output and accepts single-line
@@ -87,10 +87,22 @@ The listener and authentication boundaries above remain enforced at startup.
 
 **备份恢复** snapshots stopped app-owned servers. Restoration verifies every saved
 file and creates a separate server; it never replaces the source world. Recoverable
-removal hides the server while retaining its data and identity. **管理服务端模组**
+removal hides the server while retaining its data and identity. **管理模组与插件**
 uses the owned-content workflow described in CONTENT.md; it is not mod synchronization.
 
-Plugins, FRP configuration, reconnect/two-device acceptance, a full player management
+Paper uses stable builds from the official Fill catalog with exact URL/size/SHA-256
+validation. Paper 26.3 build 249 with LuckPerms 5.5.71 passed actual startup/query,
+plugin loading, graceful save, same-world restart and verified new-copy restoration.
+Paper and plugins may download their own runtime libraries during first start.
+AmberL pins the selected Paper entry JAR; it does not claim to sandbox third-party
+Java code or independently validate every runtime download by that code. Restored
+plugin files/configuration are preserved; content installation-group records are
+not cloned to the new server and those restored files are treated as unmanaged.
+
+**FRP** now provides an independent verified frpc process, protected saved token,
+mandatory TLS CA verification and reconnection. See [FRP setup and evidence](FRP.md).
+
+Public-node/two-device acceptance, a full player management
 UI, translation/accessibility acceptance and clean-machine deployment remain open.
 No stable release or merge is authorized by this preview.
 

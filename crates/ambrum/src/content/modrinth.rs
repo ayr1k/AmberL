@@ -87,6 +87,7 @@ fn text(v: &Value, key: &str) -> Result<String> {
 fn category(kind: &str) -> Result<&'static str> {
     match kind {
         "mod" => Ok("mods"),
+        "plugin" => Ok("plugins"),
         "resourcepack" => Ok("resourcepacks"),
         "shader" => Ok("shaderpacks"),
         _ => Err("Unsupported content kind".into()),
@@ -105,9 +106,19 @@ fn filters(context: &Context, kind: &str) -> Result<Vec<Vec<String>>> {
         }
         f.push(vec![format!("categories:{}", context.loader)]);
     }
+    if kind == "plugin" {
+        if !context.server || context.loader != "paper" {
+            return Err("插件需要 Paper 服务端".into());
+        }
+        f.push(vec![
+            "categories:paper".into(),
+            "categories:spigot".into(),
+            "categories:bukkit".into(),
+        ]);
+    }
     if context.server {
-        if kind != "mod" {
-            return Err("服务端只支持安装服务端模组".into());
+        if !matches!(kind, "mod" | "plugin") {
+            return Err("服务端只支持安装服务端模组或插件".into());
         }
         f.push(vec![
             "server_side:required".into(),
@@ -159,7 +170,9 @@ pub fn search(
 fn catalog(project: &str, kind: &str, context: &Context, c: &Cancellation) -> Result<Vec<Value>> {
     id(project)?;
     filters(context, kind)?;
-    let loaders = if kind == "mod" {
+    let loaders = if kind == "plugin" {
+        vec!["paper", "spigot", "bukkit"]
+    } else if kind == "mod" {
         vec![context.loader.as_str()]
     } else if kind == "resourcepack" {
         vec!["minecraft"]
@@ -212,7 +225,9 @@ fn compatible(v: &Value, context: &Context, kind: &str) -> Result<()> {
     {
         return Err("内容版本不适配当前游戏".into());
     }
-    let wanted = if kind == "mod" {
+    let wanted = if kind == "plugin" {
+        vec!["paper", "spigot", "bukkit"]
+    } else if kind == "mod" {
         vec![context.loader.as_str()]
     } else if kind == "resourcepack" {
         vec!["minecraft"]
@@ -248,7 +263,11 @@ fn file(v: &Value, kind: &str) -> Result<File> {
     crate::paths::name(&name)?;
     if !name
         .to_ascii_lowercase()
-        .ends_with(if kind == "mod" { ".jar" } else { ".zip" })
+        .ends_with(if matches!(kind, "mod" | "plugin") {
+            ".jar"
+        } else {
+            ".zip"
+        })
     {
         return Err("Unexpected content file type".into());
     }
@@ -276,6 +295,16 @@ fn file(v: &Value, kind: &str) -> Result<File> {
 }
 pub fn plan(version: &str, kind: &str, context: &Context, c: &Cancellation) -> Result<Plan> {
     plan_with_choices(version, kind, context, &BTreeSet::new(), c)
+}
+fn project_kind(project: &Value, context: &Context) -> Result<String> {
+    let kind = text(project, "project_type")?;
+    Ok(
+        if kind == "mod" && context.server && context.loader == "paper" {
+            "plugin".into()
+        } else {
+            kind
+        },
+    )
 }
 pub fn plan_with_choices(
     version: &str,
@@ -305,7 +334,7 @@ pub fn plan_with_choices(
             return Err("Version identity mismatch".into());
         }
         let project = get(&format!("project/{}", text(&v, "project_id")?), c)?;
-        let actual_kind = text(&project, "project_type")?;
+        let actual_kind = project_kind(&project, context)?;
         if !kind.is_empty() && actual_kind != kind {
             return Err("Content project type changed".into());
         }
@@ -319,7 +348,7 @@ pub fn plan_with_choices(
             }
             continue;
         }
-        if project["id"] != f.project || project["project_type"] != kind {
+        if project["id"] != f.project || project_kind(&project, context)? != kind {
             return Err("Content project identity mismatch".into());
         }
         if context.server && project["server_side"] == "unsupported" {
@@ -381,7 +410,7 @@ pub fn plan_with_choices(
                         let p = project.ok_or("Required dependency lacks an identity")?;
                         id_check(p)?;
                         let dependency = get(&format!("project/{p}"), c)?;
-                        let rows = catalog(p, &text(&dependency, "project_type")?, context, c)?;
+                        let rows = catalog(p, &project_kind(&dependency, context)?, context, c)?;
                         let best = rows
                             .iter()
                             .find(|r| r["version_type"] == "release")
@@ -429,6 +458,27 @@ fn id_check(s: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn plugins_require_server_loader_and_keep_a_separate_destination() {
+        let mut context = Context {
+            game: "26.3".into(),
+            loader: "paper".into(),
+            server: true,
+        };
+        let v = json!({"id":"version1","project_id":"project1","name":"test","game_versions":["26.3"],"loaders":["bukkit"],"files":[{"filename":"test.jar","primary":true,"size":3,"url":"https://cdn.modrinth.com/data/a/test.jar","hashes":{"sha1":"0".repeat(40)}}]});
+        compatible(&v, &context, "plugin").unwrap();
+        assert_eq!(file(&v, "plugin").unwrap().path, "plugins/test.jar");
+        assert_eq!(
+            project_kind(&json!({"project_type":"mod"}), &context).unwrap(),
+            "plugin"
+        );
+        assert!(compatible(&v, &context, "mod").is_err());
+        context.server = false;
+        assert!(compatible(&v, &context, "plugin").is_err());
+        context.server = true;
+        context.loader = "fabric".into();
+        assert!(compatible(&v, &context, "plugin").is_err());
+    }
     #[test]
     fn provider_context_and_content_paths_are_not_inferred() {
         let c = Context {

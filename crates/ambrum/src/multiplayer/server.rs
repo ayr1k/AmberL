@@ -392,7 +392,7 @@ pub fn run(
         return Err("Linked session lock".into());
     }
     lock.try_lock().map_err(|_| "该服务端已在运行")?;
-    config::ready(&root.root)?;
+    config::ready(&root)?;
     let mut guards = vec![];
     guard_tree(&root.root, 0, &mut 0, &mut guards)?;
     let properties = crate::paths::text(&root.root, &root.root.join("server.properties"), 65536)?;

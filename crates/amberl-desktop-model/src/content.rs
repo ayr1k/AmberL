@@ -58,6 +58,12 @@ impl Content {
     pub(super) fn apply(&mut self, response: Response) {
         match response {
             Response::Open(context, groups) => {
+                self.kind = if context.server && context.loader == "paper" {
+                    "plugin"
+                } else {
+                    "mod"
+                }
+                .into();
                 self.context = Some(context);
                 self.groups = groups;
             }

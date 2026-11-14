@@ -75,3 +75,11 @@ The package is `easytier-windows-x86_64-v2.6.4.zip` (32,657,720 bytes), SHA-256
 Executable/DLL pins are recorded in `crates/ambrum/src/multiplayer/room.rs` and
 rechecked before each owned room process. Minecraft servers are downloaded from
 official metadata after EULA acceptance, never redistributed in the preview ZIP.
+
+FRP 0.72.0 is downloaded on explicit request from the official
+[release](https://github.com/fatedier/frp/releases/tag/v0.72.0), not bundled.
+Its Apache-2.0 LICENSE is verified and retained beside frpc. The Windows AMD64 ZIP
+SHA-256 is `5197c1b69564089cdc229fc1260a0e25db1e722b1b7db45fe1542c3c43edf9ae`;
+executable/license pins are in `crates/ambrum/src/multiplayer/frp.rs`.
+Paper and selected Modrinth plugins are downloaded for the user's owned server,
+not redistributed in AmberL packages. Their upstream licenses remain applicable.

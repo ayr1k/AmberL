@@ -151,7 +151,7 @@ pub fn installed(app: &Path) -> bool {
         .iter()
         .all(|(_, name, _)| app.join("network-components").join(name).is_file())
 }
-fn hash(mut input: impl Read) -> Result<String> {
+pub(crate) fn hash(mut input: impl Read) -> Result<String> {
     let mut h = Hash::new(Algorithm::Sha256)?;
     let mut b = [0; 65536];
     loop {
@@ -164,32 +164,46 @@ fn hash(mut input: impl Read) -> Result<String> {
     h.finish()
 }
 pub fn install(app: &Path, cancel: &Cancellation) -> Result<()> {
+    let a=Artifact{url:"https://github.com/EasyTier/EasyTier/releases/download/v2.6.4/easytier-windows-x86_64-v2.6.4.zip".into(),size:32657720,algorithm:Algorithm::Sha256,digest:"27af91e270e554709b048bd32327fefd2dfce5062ae1e8701af7550c6f525f84".into()};
+    install_bundle(app, "network-components", &COMPONENTS, &a, cancel)
+}
+pub(crate) fn install_bundle(
+    app: &Path,
+    folder: &str,
+    components: &[(&str, &str, &str)],
+    a: &Artifact,
+    cancel: &Cancellation,
+) -> Result<()> {
+    crate::paths::name(folder)?;
     let _app = DirectoryGuard::open(app)?;
-    let parent = app.join("network-components");
+    let parent = app.join(folder);
     match fs::create_dir(&parent) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
         Err(e) => return Err(e.to_string()),
     }
     let _parent = DirectoryGuard::open(&parent)?;
-    for (_, name, expected) in COMPONENTS {
+    for &(_, name, expected) in components {
+        crate::paths::name(name)?;
         let target = parent.join(name);
         if target.exists() && hash(pin(&target)?)? != expected {
             return Err("联机组件校验失败；原文件已保留".into());
         }
     }
-    if installed(app) {
+    if components
+        .iter()
+        .all(|(_, name, _)| parent.join(name).is_file())
+    {
         return Ok(());
     }
     let cache = Cache::open(app)?;
-    let a=Artifact{url:"https://github.com/EasyTier/EasyTier/releases/download/v2.6.4/easytier-windows-x86_64-v2.6.4.zip".into(),size:32657720,algorithm:Algorithm::Sha256,digest:"27af91e270e554709b048bd32327fefd2dfce5062ae1e8701af7550c6f525f84".into()};
-    cache.fetch(&a, &crate::download::windows::GithubRelease, cancel, |_| {})?;
-    let f = cache.verified_file(&a, cancel)?;
-    let mut archive = zip::ZipArchive::new(f).map_err(|_| "Invalid EasyTier ZIP")?;
+    cache.fetch(a, &crate::download::windows::GithubRelease, cancel, |_| {})?;
+    let f = cache.verified_file(a, cancel)?;
+    let mut archive = zip::ZipArchive::new(f).map_err(|_| "Invalid component ZIP")?;
     if archive.len() > 128 {
         return Err("Component archive entry limit".into());
     }
-    for (source, name, expected) in COMPONENTS {
+    for &(source, name, expected) in components {
         let target = parent.join(name);
         if target.exists() {
             continue;
@@ -210,7 +224,7 @@ pub fn install(app: &Path, cancel: &Cancellation) -> Result<()> {
             }
         }
         let mut input = archive
-            .by_index(entry.ok_or("Missing EasyTier executable")?)
+            .by_index(entry.ok_or("Missing component file")?)
             .map_err(|_| "Cannot read component")?;
         let stage = parent.join(format!("{}.tmp", new_id()?));
         let mut output = options()
@@ -237,7 +251,7 @@ pub fn install(app: &Path, cancel: &Cancellation) -> Result<()> {
             output.write_all(&buf[..n]).map_err(|e| e.to_string())?;
         }
         if h.finish()? != expected {
-            return Err("EasyTier executable checksum mismatch".into());
+            return Err("Component file checksum mismatch".into());
         }
         output.sync_all().map_err(|e| e.to_string())?;
         drop(output);
@@ -247,7 +261,7 @@ pub fn install(app: &Path, cancel: &Cancellation) -> Result<()> {
     }
     Ok(())
 }
-fn pin(path: &Path) -> Result<fs::File> {
+pub(crate) fn pin(path: &Path) -> Result<fs::File> {
     let f = options()
         .share_mode(FILE_SHARE_READ)
         .open(path)

@@ -2,11 +2,13 @@
 //! Independent server, room and query lifecycles; a running server does not block game launch.
 use ambrum::{
     Result,
-    multiplayer::{self, Address, room, server},
+    multiplayer::{self, Address, frp, room, server},
     task::Cancellation,
 };
 use std::{collections::VecDeque, path::PathBuf, sync::mpsc, thread};
 enum Message {
+    FrpProfile(Option<frp::Config>),
+    FrpStarted,
     Configuration(server::config::Snapshot),
     Loaders(String, String, Vec<String>),
     Servers(Vec<server::Server>),
@@ -60,16 +62,22 @@ pub struct Network {
     pub archived: Vec<server::Server>,
     pub configuration: Option<server::config::Snapshot>,
     pub configuration_revision: u64,
+    pub frp_config: Option<frp::Config>,
+    pub frp_revision: u64,
+    pub frp_status: String,
+    pub frp_component: bool,
     maintenance: Option<Worker>,
     server: Option<Worker>,
     room: Option<Worker>,
     query: Option<Worker>,
+    frp: Option<Worker>,
     commands: Option<mpsc::SyncSender<String>>,
     log: VecDeque<String>,
 }
 impl Network {
     pub fn new(app: PathBuf) -> Self {
         let component = room::installed(&app);
+        let frp_component = frp::installed(&app);
         Self {
             app,
             servers: vec![],
@@ -88,10 +96,15 @@ impl Network {
             archived: vec![],
             configuration: None,
             configuration_revision: 0,
+            frp_config: None,
+            frp_revision: 0,
+            frp_status: "未启动 FRP".into(),
+            frp_component,
             maintenance: None,
             server: None,
             room: None,
             query: None,
+            frp: None,
             commands: None,
             log: VecDeque::new(),
         }
@@ -106,7 +119,55 @@ impl Network {
         self.room.is_some()
     }
     pub fn active(&self) -> bool {
-        self.busy() || self.server_active() || self.room_active() || self.query.is_some()
+        self.busy()
+            || self.server_active()
+            || self.room_active()
+            || self.query.is_some()
+            || self.frp_active()
+    }
+    pub fn frp_active(&self) -> bool {
+        self.frp.is_some()
+    }
+    pub fn install_frp(&mut self) -> Result<()> {
+        self.maintenance(|app, c, _| frp::install(&app, &c))
+    }
+    pub fn load_frp(&mut self) -> Result<()> {
+        self.maintenance(|app, _, tx| {
+            tx.send(Message::FrpProfile(frp::load(&app)?))
+                .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn start_frp(&mut self, config: frp::Config, token: String) -> Result<()> {
+        if self.frp_active() || self.busy() {
+            return Err("请先停止当前 FRP 或等待配置完成".into());
+        }
+        if !self.frp_component {
+            return Err("请先下载 FRP 组件".into());
+        }
+        let app = self.app.clone();
+        self.frp = Some(worker(move |c, tx| {
+            frp::save(&app, &config, token)?;
+            tx.send(Message::FrpProfile(Some(config.clone())))
+                .map_err(|_| "Window closed")?;
+            let code = frp::run(&app, &config, &c, |_| {
+                let _ = tx.send(Message::FrpStarted);
+            })?;
+            if code != 0 {
+                return Err(format!("FRP 退出码 {code}；请检查节点、证书和令牌"));
+            }
+            Ok(())
+        })?);
+        self.frp_status = "正在校验 FRP 配置与组件".into();
+        self.revision += 1;
+        Ok(())
+    }
+    pub fn stop_frp(&mut self) {
+        if let Some(w) = &self.frp {
+            w.cancel.cancel();
+            self.frp_status = "正在停止 FRP".into();
+            self.revision += 1;
+        }
     }
     pub fn report(&mut self, value: String) {
         self.status = value.chars().take(2048).collect();
@@ -219,7 +280,8 @@ impl Network {
     }
     pub fn load_loaders(&mut self, game: String, kind: String) -> Result<()> {
         self.maintenance(move |_, c, tx| {
-            let rows = ambrum::loader::versions(&game, &kind, &ambrum::download::Https, &c)?;
+            let rows =
+                ambrum::loader::server::versions(&game, &kind, &ambrum::download::Https, &c)?;
             tx.send(Message::Loaders(game, kind, rows))
                 .map_err(|_| "Window closed")?;
             Ok(())
@@ -359,6 +421,7 @@ impl Network {
     pub fn shutdown(&mut self) {
         self.stop_server();
         self.leave();
+        self.stop_frp();
         if let Some(w) = &self.maintenance {
             w.cancel.cancel();
         }
@@ -367,7 +430,7 @@ impl Network {
         }
     }
     pub fn tick(&mut self) {
-        for slot in 0..4 {
+        for slot in 0..5 {
             let mut done = None;
             let mut messages = vec![];
             {
@@ -375,7 +438,8 @@ impl Network {
                     0 => &self.maintenance,
                     1 => &self.server,
                     2 => &self.room,
-                    _ => &self.query,
+                    3 => &self.query,
+                    _ => &self.frp,
                 };
                 if let Some(w) = worker {
                     for _ in 0..128 {
@@ -396,6 +460,13 @@ impl Network {
             }
             for message in messages {
                 match message {
+                    Message::FrpProfile(config) => {
+                        self.frp_config = config;
+                        self.frp_revision += 1;
+                    }
+                    Message::FrpStarted => {
+                        self.frp_status = "FRP 进程运行中，会尝试重连；外部可达性尚未确认".into()
+                    }
                     Message::Configuration(snapshot) => {
                         self.configuration = Some(snapshot);
                         self.configuration_revision += 1;
@@ -455,7 +526,8 @@ impl Network {
                     0 => &mut self.maintenance,
                     1 => &mut self.server,
                     2 => &mut self.room,
-                    _ => &mut self.query,
+                    3 => &mut self.query,
+                    _ => &mut self.frp,
                 };
                 if let Some(w) = slot_ref.take() {
                     let _ = w.handle.join();
@@ -464,6 +536,7 @@ impl Network {
                 match slot {
                     0 => {
                         self.component = room::installed(&self.app);
+                        self.frp_component = frp::installed(&self.app);
                         self.status = error.unwrap_or_else(|| "联机配置已完成".into());
                     }
                     1 => {
@@ -475,11 +548,12 @@ impl Network {
                         self.join_address.clear();
                         self.room_status = error.unwrap_or_else(|| "已离开房间".into());
                     }
-                    _ => {
+                    3 => {
                         if let Some(e) = error {
                             self.query_status = e;
                         }
                     }
+                    _ => self.frp_status = error.unwrap_or_else(|| "FRP 已停止".into()),
                 }
                 self.revision += 1;
             }
@@ -518,9 +592,22 @@ mod tests {
             })
             .unwrap(),
         );
+        n.frp = Some(
+            worker(|cancel, tx| {
+                let _ = tx.send(Message::FrpStarted);
+                while cancel.check().is_ok() {
+                    thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Ok(())
+            })
+            .unwrap(),
+        );
         for _ in 0..20 {
             n.tick();
-            if n.invite == "test invitation" {
+            if n.invite == "test invitation"
+                && n.frp_status.contains("尚未确认")
+                && n.server_status.contains("正在准备世界")
+            {
                 break;
             }
             thread::sleep(std::time::Duration::from_millis(5));
@@ -528,6 +615,17 @@ mod tests {
         assert!(!n.busy());
         assert!(n.server_status.contains("正在准备世界"));
         assert!(n.room_status.contains("尚不能证明"));
+        assert!(n.frp_status.contains("尚未确认"));
+        n.stop_frp();
+        for _ in 0..40 {
+            n.tick();
+            if !n.frp_active() {
+                break;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(!n.frp_active());
+        assert!(n.server_active() && n.room_active());
         n.leave();
         for _ in 0..40 {
             n.tick();

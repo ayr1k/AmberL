@@ -128,8 +128,8 @@ fn decode(text: &str) -> Result<String> {
     }
     String::from_utf16(&units).map_err(|_| "无效描述文字".into())
 }
-pub(super) fn ready(root: &Path) -> Result<()> {
-    if Document::<Recovery>::open(root, "amberl-properties-recovery.json")?
+pub(super) fn ready(root: &DirectoryGuard) -> Result<()> {
+    if Document::<Recovery>::open_owned(root, "amberl-properties-recovery.json")?
         .data
         .pending
     {
@@ -139,7 +139,7 @@ pub(super) fn ready(root: &Path) -> Result<()> {
 }
 pub fn read(app: &Path, id: &str) -> Result<Snapshot> {
     let (root, _lock, _) = content_lock(app, id)?;
-    ready(&root.root)?;
+    ready(&root)?;
     let (_file, text) = open(&root.root)?;
     Ok(Snapshot {
         server: id.into(),
@@ -157,7 +157,7 @@ fn write(file: &mut fs::File, text: &str) -> Result<()> {
 pub fn save(app: &Path, expected: &Snapshot, settings: &Settings) -> Result<Snapshot> {
     validate(settings)?;
     let (root, _lock, _) = content_lock(app, &expected.server)?;
-    let mut recovery = Document::<Recovery>::open(&root.root, "amberl-properties-recovery.json")?;
+    let mut recovery = Document::<Recovery>::open_owned(&root, "amberl-properties-recovery.json")?;
     if recovery.data.pending {
         return Err("请先恢复上次未完成的配置".into());
     }
@@ -204,7 +204,7 @@ pub fn save(app: &Path, expected: &Snapshot, settings: &Settings) -> Result<Snap
 }
 pub fn recover(app: &Path, id: &str) -> Result<()> {
     let (root, _lock, _) = content_lock(app, id)?;
-    let mut recovery = Document::<Recovery>::open(&root.root, "amberl-properties-recovery.json")?;
+    let mut recovery = Document::<Recovery>::open_owned(&root, "amberl-properties-recovery.json")?;
     if !recovery.data.pending {
         return Err("没有未完成的配置写入".into());
     }
@@ -239,6 +239,8 @@ mod tests {
     #[test]
     fn config_preserves_unknowns_and_rejects_stale_live_or_unsafe_edits() {
         let (app, id, root) = fixture();
+        fs::create_dir(root.join("versions")).unwrap();
+        assert!(Document::<Recovery>::open(&root, "app.json").is_err());
         let before = read(&app, &id).unwrap();
         let mut settings = before.settings.clone();
         settings.players = 12;
@@ -269,9 +271,9 @@ mod tests {
         doc.save().unwrap();
         drop(doc);
         fs::write(root.join("server.properties"), "partial").unwrap();
-        assert!(ready(&root).is_err());
+        assert!(ready(&DirectoryGuard::open(&root).unwrap()).is_err());
         recover(&app, &id).unwrap();
-        ready(&root).unwrap();
+        ready(&DirectoryGuard::open(&root).unwrap()).unwrap();
         assert_eq!(
             fs::read_to_string(root.join("server.properties")).unwrap(),
             original

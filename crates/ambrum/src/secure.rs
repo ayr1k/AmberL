@@ -33,6 +33,12 @@ pub fn check_available() -> Result<()> {
 }
 
 fn protect(input: &[u8], decrypt: bool) -> Result<Zeroizing<Vec<u8>>> {
+    protect_with_entropy(input, decrypt, ENTROPY)
+}
+pub(crate) fn protect_frp(input: &[u8], decrypt: bool) -> Result<Zeroizing<Vec<u8>>> {
+    protect_with_entropy(input, decrypt, b"io.github.ayr1k.amberl/frp-v1")
+}
+fn protect_with_entropy(input: &[u8], decrypt: bool, entropy: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     if input.len() as u64 > MAX_STORE {
         return Err("Credential store exceeds limit".into());
     }
@@ -41,8 +47,8 @@ fn protect(input: &[u8], decrypt: bool) -> Result<Zeroizing<Vec<u8>>> {
         pbData: input.as_ptr().cast_mut(),
     };
     let entropy = CRYPT_INTEGER_BLOB {
-        cbData: ENTROPY.len() as u32,
-        pbData: ENTROPY.as_ptr().cast_mut(),
+        cbData: entropy.len() as u32,
+        pbData: entropy.as_ptr().cast_mut(),
     };
     let mut output = CRYPT_INTEGER_BLOB::default();
     let ok = unsafe {

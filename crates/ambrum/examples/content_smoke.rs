@@ -11,9 +11,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let app = std::path::PathBuf::from(&a[0]);
     std::fs::create_dir_all(&app)?;
-    let target = content::Target::Client {
-        root: a[1].as_str().into(),
-        version: a[2].clone(),
+    let target = if a[2] == "--server" {
+        content::Target::Server { id: a[1].clone() }
+    } else {
+        content::Target::Client {
+            root: a[1].as_str().into(),
+            version: a[2].clone(),
+        }
     };
     let c = Cancellation::default();
     let context = content::context(&app, &target, &c)?;

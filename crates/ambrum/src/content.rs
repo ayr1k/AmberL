@@ -125,7 +125,7 @@ fn validate(data: &Data) -> Result<()> {
             crate::manifest::relative_path(&f.path)?;
             let (dir, name) = f.path.split_once('/').ok_or("Invalid content path")?;
             crate::paths::name(name)?;
-            if !["mods", "resourcepacks", "shaderpacks"].contains(&dir)
+            if !["mods", "plugins", "resourcepacks", "shaderpacks"].contains(&dir)
                 || !paths.insert(f.path.to_ascii_lowercase())
                 || !f.artifact.url.starts_with("https://cdn.modrinth.com/data/")
             {

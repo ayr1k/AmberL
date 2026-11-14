@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Explicit endpoint parsing and bounded Minecraft status queries; never imply login readiness.
+pub mod frp;
 pub mod room;
 pub mod server;
 use crate::Result;

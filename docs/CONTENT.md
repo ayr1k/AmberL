@@ -1,7 +1,7 @@
 # Owned content and Java runtimes / 内容与 Java 管理
 
 Game configuration opens **模组与资源**; stopped modded servers open
-**管理服务端模组**. Search Modrinth, select a project and compatible version,
+**管理模组与插件**. Search Modrinth, select a project and compatible version,
 preview the exact required dependency/file list, then install. Optional dependencies
 are individually selectable and trigger a new complete plan check. Resource packs
 and shaders are client-only. Shader installation does not install a renderer.
@@ -18,7 +18,12 @@ Placeholder API 3.2.0 and Fabric API 0.166.2 on Fabric 0.19.5 / Minecraft 26.3.
 Faithful 32x and Complementary Reimagined passed package install/remove/restore;
 shader rendering is not claimed. Jade/JEI optional selection was verified against
 real 1.21.1 metadata (one file → four files → one file), without changing game data.
-Additional providers, filter overrides and plugin support remain open.
+Paper servers default to the plugin category. Paper/Spigot/Bukkit versions are
+checked against provider metadata and installed into `plugins`, separately from
+loader mods. LuckPerms 5.5.71 passed actual search, install/remove/restore and
+loading on Paper 26.3 build 249, including world restart and backup restoration.
+Plugin-generated data/configuration are preserved when its managed JAR is removed.
+Additional providers and filter overrides remain open.
 
 **Java** can discover local executables or explicitly download an independent Mojang
 runtime. The official manifest and each raw file are checksum-verified; installed

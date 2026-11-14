@@ -3,6 +3,7 @@
 #[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use ambrum::{
+        content::{self, modrinth},
         loader,
         multiplayer::{self, Address, server},
         task::Cancellation,
@@ -13,8 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         time::{Duration, Instant},
     };
     let args = std::env::args().skip(1).collect::<Vec<_>>();
-    if args.len() != 6 || args[5] != "--accept-eula" {
-        return Err("server_smoke APP JAVA GAME KIND LOADER_VERSION --accept-eula (disposable new world only)".into());
+    if !matches!(args.len(), 6 | 9)
+        || args[5] != "--accept-eula"
+        || args.len() == 9 && args[6] != "--plugin"
+    {
+        return Err("server_smoke APP JAVA GAME KIND LOADER_VERSION --accept-eula [--plugin PROJECT EXPECTED_NAME] (disposable new world only)".into());
     }
     let app = PathBuf::from(&args[0]);
     std::fs::create_dir_all(&app)?;
@@ -44,6 +48,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     drop(reservation);
     println!("CREATED {} {} {}", record.id, record.version, kind);
+    if args.len() == 9 {
+        let c = Cancellation::default();
+        let target = content::Target::Server {
+            id: record.id.clone(),
+        };
+        let context = content::context(&app, &target, &c)?;
+        let hits = modrinth::search(&args[8], "plugin", &context, &c)?;
+        if !hits.iter().any(|p| p.id == args[7]) {
+            return Err("Plugin search did not find expected project".into());
+        }
+        let versions = modrinth::versions(&args[7], "plugin", &context, &c)?;
+        let version = versions.first().ok_or("No compatible plugin")?;
+        let plan = modrinth::plan(&version.id, "plugin", &context, &c)?;
+        for file in &plan.files {
+            println!("PLUGIN {} {}", file.title, file.path);
+        }
+        let group = content::install(&app, &target, &plan, &c)?;
+        content::change(&app, &target, &group, "remove", &c)?;
+        content::change(&app, &target, &group, "restore", &c)?;
+        println!("PLUGIN search/install/remove/restore passed");
+    }
     for round in 0..3 {
         let cancel = Cancellation::default();
         let token = cancel.clone();
@@ -61,6 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut ready = false;
         let mut listed = false;
         let mut probe_ok = false;
+        let mut plugin_ok = args.len() != 9;
         while Instant::now() < deadline && !handle.is_finished() {
             if let Ok(e) = events.recv_timeout(Duration::from_millis(100)) {
                 match e {
@@ -78,11 +104,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             std::thread::sleep(Duration::from_millis(250));
                         }
                         commands.send("list".into())?;
+                        if args.len() == 9 {
+                            commands.send("plugins".into())?;
+                        }
                     }
                     server::Event::Line(line) => {
                         println!("{line}");
                         if ready && line.contains("players online") {
                             listed = true;
+                        }
+                        if ready && args.len() == 9 && line.contains(&args[8]) {
+                            plugin_ok = true;
+                        }
+                        if listed && plugin_ok {
                             break;
                         }
                     }
@@ -104,9 +138,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .join("world/level.dat")
             .is_file();
         println!(
-            "ROUND {round}: ready={ready} status={probe_ok} console={listed} exit={code} saved={saved}"
+            "ROUND {round}: ready={ready} status={probe_ok} console={listed} plugin={plugin_ok} exit={code} saved={saved}"
         );
-        if !ready || !probe_ok || !listed || code != 0 || !saved {
+        if !ready || !probe_ok || !listed || !plugin_ok || code != 0 || !saved {
             return Err("Server lifecycle check failed".into());
         }
         if round == 1 {

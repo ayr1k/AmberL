@@ -111,6 +111,14 @@ export component Launcher inherits Window {
     in property <[string]> server-loader-options; in-out property <int> server-loader-index: -1;
     callback load-server-loaders();
     in property <bool> network-busy; in property <bool> server-active; in property <bool> room-active; in property <bool> component-ready;
+    in property <bool> frp-active; in property <bool> frp-ready;
+    in property <string> frp-status;
+    in-out property <string> frp-server;
+    in-out property <string> frp-certificate;
+    in-out property <string> frp-token;
+    in-out property <int> frp-local-port: 25565;
+    in-out property <int> frp-remote-port: 25565;
+    callback load-frp(); callback install-frp(); callback start-frp(); callback stop-frp();
     in property <string> network-status; in property <string> server-status; in property <string> room-status; in property <string> query-status;
     in property <string> server-log; in property <string> room-invite; in property <string> room-address;
     in-out property <string> server-name: "好友的世界"; in-out property <int> server-port: 25565; in-out property <int> server-memory: 2048; in-out property <bool> server-eula: false;
@@ -132,6 +140,7 @@ export component Launcher inherits Window {
     in-out property <string> server-difficulty: "easy";
     in-out property <string> server-mode: "survival";
     in property <string> content-target; in property <string> content-preview;
+    in property <bool> content-server;
     in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
     in property <[string]> content-group-states;
     in property <[OptionalRow]> content-optional;
@@ -212,7 +221,7 @@ export component Launcher inherits Window {
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
                     Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : root.panel == 8 ? "内容管理" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
-                    Action { width: 100px; label: "返回游戏"; clicked => { root.panel=0; } }
+                    Action { width: 100px; label: root.panel == 8 && root.content-server ? "返回联机" : "返回游戏"; clicked => { root.panel=root.panel == 8 && root.content-server ? 6 : 0; } }
                 }
                 if root.panel == 1: VerticalLayout {
                     vertical-stretch: 0;
@@ -346,6 +355,27 @@ export component Launcher inherits Window {
                         Action { label: "加入游戏"; selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
                         Action { label: "控制台"; selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
                         Action { label: "备份恢复"; selected: root.network-tab == 5; clicked => { root.network-tab=5; root.refresh-servers(); } }
+                        Action { label: "FRP"; selected: root.network-tab == 7; clicked => { root.network-tab=7; root.load-frp(); } }
+                    }
+                    if root.network-tab == 7: VerticalLayout { spacing: 12px;
+                        Text { text: root.frp-status; color: #9ae3cc; wrap: word-wrap; vertical-stretch: 0; }
+                        Text { text: "节点地址（主机:端口）"; color: #becacb; vertical-stretch: 0; }
+                        LineEdit { text <=> root.frp-server; placeholder-text: "frp.example.com:7000"; accessible-label: "FRP 节点地址"; enabled: !root.frp-active && !root.network-busy; }
+                        Text { text: "节点 CA 证书（PEM 文件路径）"; color: #becacb; vertical-stretch: 0; }
+                        LineEdit { text <=> root.frp-certificate; accessible-label: "FRP 节点证书"; enabled: !root.frp-active && !root.network-busy; }
+                        LineEdit { text <=> root.frp-token; input-type: password; placeholder-text: "节点令牌 · 留空使用已保存令牌"; accessible-label: "FRP 节点令牌"; enabled: !root.frp-active && !root.network-busy; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: "本地游戏端口"; color: #becacb; vertical-alignment: center; }
+                            SpinBox { value <=> root.frp-local-port; minimum: 1024; maximum: 65535; enabled: !root.frp-active; }
+                            Text { text: "节点公开端口"; color: #becacb; vertical-alignment: center; }
+                            SpinBox { value <=> root.frp-remote-port; minimum: 1024; maximum: 65535; enabled: !root.frp-active; }
+                        }
+                        Text { text: "启动后，节点会将公开端口转发到指定的本地游戏端口。FRP 与游戏、服务端独立启停；令牌保存在系统安全存储中。"; color: #becacb; wrap: word-wrap; vertical-stretch: 0; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: root.frp-ready ? "校验 FRP 组件" : "下载 FRP 组件"; enabled: !root.network-busy && !root.frp-active; clicked => { root.install-frp(); } }
+                            Action { label: "保存并启动"; selected: true; enabled: root.frp-ready && !root.network-busy && !root.frp-active && root.frp-server != "" && root.frp-certificate != ""; clicked => { root.start-frp(); } }
+                            Action { label: "停止 FRP"; enabled: root.frp-active; clicked => { root.stop-frp(); } }
+                        }
                     }
                     if root.network-tab == 0: VerticalLayout { spacing: 16px;
                         Text { vertical-stretch: 0; text: "我的独立服务端"; color: #d9e2e0; font-size: 14px; }
@@ -366,7 +396,7 @@ export component Launcher inherits Window {
                         }
                         Text { vertical-stretch: 0; text: "服务端与游戏可同时运行。只监听本机，启用正版验证；使用邀请房间与朋友连接。"; color: #becacb; wrap: word-wrap; font-size: 14px; }
                         HorizontalLayout { height: 40px; spacing: 12px;
-                            Action { label: "管理服务端模组"; enabled: !root.busy && !root.server-active && root.server-index >= 0; clicked => { root.open-content(true); } }
+                            Action { label: "管理模组与插件"; enabled: !root.busy && !root.server-active && root.server-index >= 0; clicked => { root.open-content(true); } }
                             Action { label: "服务端配置"; enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.network-tab=6; root.load-server-config(); } }
                         }
                     }
@@ -400,7 +430,7 @@ export component Launcher inherits Window {
                             Action { width: 96px; label: "更新列表"; enabled: !root.busy; clicked => { root.load-versions(); } }
                         }
                         HorizontalLayout { height: 40px; spacing: 12px;
-                            ComboBox { width: 160px; model: ["原版", "Fabric", "Quilt", "Forge", "NeoForge"]; current-value <=> root.server-loader-kind; enabled: !root.network-busy; }
+                            ComboBox { width: 160px; model: ["原版", "Fabric", "Quilt", "Forge", "NeoForge", "Paper"]; current-value <=> root.server-loader-kind; enabled: !root.network-busy; }
                             ComboBox { model: root.server-loader-options; current-index <=> root.server-loader-index; enabled: !root.network-busy && root.server-loader-kind != "原版"; }
                             Action { width: 96px; label: "加载器列表"; enabled: !root.network-busy && root.server-version-index >= 0 && root.server-loader-kind != "原版"; clicked => { root.load-server-loaders(); } }
                         }
@@ -492,7 +522,7 @@ export component Launcher inherits Window {
                     }
                     if root.content-tab == 0 && root.content-step == 0: VerticalLayout { spacing: 10px;
                         HorizontalLayout { height: 40px; spacing: 12px;
-                            ComboBox { width: 124px; model: ["模组", "资源包", "光影"]; current-index <=> root.content-kind-index; enabled: !root.busy; selected(value) => { root.search-content(); } }
+                            ComboBox { width: 124px; model: ["模组", "资源包", "光影", "插件"]; current-index <=> root.content-kind-index; enabled: !root.busy; selected(value) => { root.search-content(); } }
                             LineEdit { text <=> root.content-query; placeholder-text: "搜索 Modrinth"; accessible-label: "搜索内容"; enabled: !root.busy; }
                             Action { width: 80px; label: "搜索"; enabled: !root.busy; clicked => { root.search-content(); } }
                         }
