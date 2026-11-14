@@ -12,6 +12,9 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_SystemInformation"] }
 slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-software", "accessibility", "compat-1-2"] }
 
+[build-dependencies]
+slint-build = "=1.18.1"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

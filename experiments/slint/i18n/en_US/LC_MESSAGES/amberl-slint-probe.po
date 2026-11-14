@@ -1,0 +1,671 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en_US\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid " · 创建独立目录，不覆盖同名游戏。"
+msgstr " · Creates a separate folder; existing games are preserved."
+
+msgid " 版本"
+msgstr " version"
+
+msgid "01  游戏版本"
+msgstr "01  Game version"
+
+msgid "02  组件"
+msgstr "02  Loader"
+
+msgid "03  名称与位置"
+msgstr "03  Name and location"
+
+msgid "安装此清单"
+msgstr "Install these files"
+
+msgid "安装父目录"
+msgstr "Installation parent folder"
+
+msgid "安装父目录 · 选择一个已有文件夹"
+msgstr "Parent folder · choose an existing folder"
+
+msgid "安装前仍会核对兼容性"
+msgstr "Compatibility is checked before installation"
+
+msgid "安装时会再次核验兼容关系与下载文件。"
+msgstr "Compatibility and downloaded files are checked again before installation."
+
+msgid "安装游戏"
+msgstr "Install game"
+
+msgid "安装游戏，或添加已有游戏库"
+msgstr "Install a game or add an existing library"
+
+msgid "按安装组管理；共享依赖会保留。被手动修改的文件会停止操作并保留。恢复不会覆盖其他文件。"
+msgstr "Manage installation groups. Shared dependencies are retained. Changed files stop the operation and are preserved. Restore never overwrites other files."
+
+msgid "保存并启动"
+msgstr "Save and start"
+
+msgid "保存并停止"
+msgstr "Save and stop"
+
+msgid "保存名称与图标"
+msgstr "Save name and icon"
+
+msgid "保存配置"
+msgstr "Save settings"
+
+msgid "保存启动配置"
+msgstr "Save launch settings"
+
+msgid "保存时检查外部修改，并保留恢复副本。若写入中断，先恢复配置再启动。"
+msgstr "Saving checks for external edits and keeps a recovery copy. Recover interrupted writes before starting."
+
+msgid "备份恢复"
+msgstr "Backups"
+
+msgid "备份所选服务端"
+msgstr "Back up selected server"
+
+msgid "备份与恢复"
+msgstr "Backup and recovery"
+
+msgid "本地端口"
+msgstr "Local port"
+
+msgid "本地游戏端口"
+msgstr "Local game port"
+
+msgid "不安装额外加载器，直接使用 Minecraft 原版客户端。"
+msgstr "Use the original Minecraft client without an additional loader."
+
+msgid "草方块"
+msgstr "Grass"
+
+msgid "插件"
+msgstr "Plugins"
+
+msgid "查询游戏状态"
+msgstr "Query game status"
+
+msgid "查找本机 Java"
+msgstr "Find local Java"
+
+msgid "查找内容"
+msgstr "Find content"
+
+msgid "创建服务端"
+msgstr "Create server"
+
+msgid "创建完整备份"
+msgstr "Create full backup"
+
+msgid "创建邀请"
+msgstr "Create invitation"
+
+msgid "从列表选择一个游戏版本"
+msgstr "Choose a game version from the list"
+
+msgid "存档保存在 AmberL 独立应用目录中。只新建服务端，不导入或覆盖现有世界。"
+msgstr "Worlds stay in AmberL's separate app folder. This creates a new server without importing or overwriting existing worlds."
+
+msgid "打开当前游戏配置"
+msgstr "Open game settings"
+
+msgid "打开微软官方登录页面"
+msgstr "Open Microsoft sign-in"
+
+msgid "打开游戏目录"
+msgstr "Open game folder"
+
+msgid "当前任务"
+msgstr "Current task"
+
+msgid "当前实例"
+msgstr "Current instance"
+
+msgid "当前账户"
+msgstr "Current account"
+
+msgid "登记并扫描"
+msgstr "Add and scan"
+
+msgid "登录微软账户"
+msgstr "Sign in with Microsoft"
+
+msgid "登录由微软官方网页完成。账户保存在当前 Windows 用户的安全存储中。"
+msgstr "Sign in on Microsoft's official website. Accounts use secure storage for the current Windows user."
+
+msgid "独立文件夹名称"
+msgstr "New folder name"
+
+msgid "发送"
+msgstr "Send"
+
+msgid "返回联机"
+msgstr "Back to multiplayer"
+
+msgid "返回选择"
+msgstr "Back to selection"
+
+msgid "返回游戏"
+msgstr "Back to games"
+
+msgid "房间邀请，选择并复制给朋友"
+msgstr "Room invitation · select and copy for friends"
+
+msgid "房间邀请码"
+msgstr "Room invitation"
+
+msgid "服务端"
+msgstr "Server"
+
+msgid "服务端控制台输出"
+msgstr "Server console output"
+
+msgid "服务端名称"
+msgstr "Server name"
+
+msgid "服务端命令"
+msgstr "Server command"
+
+msgid "服务端内存（MiB）"
+msgstr "Server memory (MiB)"
+
+msgid "服务端配置"
+msgstr "Server settings"
+
+msgid "服务端配置 · 停服后保存"
+msgstr "Server settings · stop before saving"
+
+msgid "服务端与游戏可同时运行。只监听本机，启用正版验证；使用邀请房间与朋友连接。"
+msgstr "The server and game can run together. The server listens locally with online authentication. Connect friends through an invitation room."
+
+msgid "服务器地址或房间本地地址"
+msgstr "Server or local room address"
+
+msgid "服务器描述"
+msgstr "Server description"
+
+msgid "该游戏版本暂无可用结果，可切换加载器或重试。"
+msgstr "No results for this game version. Choose another loader or retry."
+
+msgid "镐"
+msgstr "Pickaxe"
+
+msgid "更新列表"
+msgstr "Refresh list"
+
+msgid "共享本机 Minecraft 端口"
+msgstr "Share local Minecraft port"
+
+msgid "关闭窗口"
+msgstr "Close window"
+
+msgid "关闭房间"
+msgstr "Close room"
+
+msgid "关于"
+msgstr "About"
+
+msgid "关于 AmberL"
+msgstr "About AmberL"
+
+msgid "管理模组与插件"
+msgstr "Manage mods and plugins"
+
+msgid "光影"
+msgstr "Shaders"
+
+msgid "还没有游戏\n安装一个原版，或添加已有游戏库。"
+msgstr "No games yet\nInstall Minecraft or add an existing library."
+
+msgid "好友的世界"
+msgstr "Friends' world"
+
+msgid "恢复安装组"
+msgstr "Restore group"
+
+msgid "恢复到列表"
+msgstr "Return to list"
+
+msgid "恢复的世界"
+msgstr "Restored world"
+
+msgid "恢复父目录（已存在的独立目录）"
+msgstr "Restore parent folder (existing separate folder)"
+
+msgid "恢复后的服务端名称"
+msgstr "Restored server name"
+
+msgid "恢复会创建独立副本，不覆盖原游戏。损坏或同名冲突会停止恢复并保留现场。"
+msgstr "Restore creates a separate copy. It never overwrites the original. Corruption or a name conflict stops restoration and preserves partial files."
+
+msgid "恢复显示"
+msgstr "Show again"
+
+msgid "恢复中断写入"
+msgstr "Recover interrupted write"
+
+msgid "继续未完成安装"
+msgstr "Resume installation"
+
+msgid "加入游戏"
+msgstr "Join game"
+
+msgid "加入游戏地址"
+msgstr "Game address"
+
+msgid "加载器列表"
+msgstr "Loader versions"
+
+msgid "节点 CA 证书（PEM 文件路径）"
+msgstr "Relay CA certificate (PEM path)"
+
+msgid "节点地址（主机:端口）"
+msgstr "Relay address (host:port)"
+
+msgid "节点公开端口"
+msgstr "Public relay port"
+
+msgid "节点令牌 · 留空使用已保存令牌"
+msgstr "Relay token · leave blank to use saved token"
+
+msgid "仅安装加载器；Fabric API、QSL 等模组需按模组要求另行安装。"
+msgstr "Installs the loader only. Add Fabric API, QSL and other required mods separately."
+
+msgid "空间预算（GiB）"
+msgstr "Space budget (GiB)"
+
+msgid "控制台"
+msgstr "Console"
+
+msgid "快照版"
+msgstr "Snapshots"
+
+msgid "离开"
+msgstr "Leave"
+
+msgid "历史版本"
+msgstr "Historical"
+
+msgid "连接房间"
+msgstr "Connect to room"
+
+msgid "连接节点（可修改为自己的 EasyTier 节点）"
+msgstr "Relay address (your EasyTier relay can be used)"
+
+msgid "联机"
+msgstr "Multiplayer"
+
+msgid "没有匹配的版本，可清除搜索或重试刷新。"
+msgstr "No matching versions. Clear the search or refresh."
+
+msgid "名称与监听端口"
+msgstr "Name and listening port"
+
+msgid "模式"
+msgstr "Game mode"
+
+msgid "模组"
+msgstr "Mods"
+
+msgid "模组与资源"
+msgstr "Mods and resources"
+
+msgid "难度"
+msgstr "Difficulty"
+
+msgid "内容安装清单"
+msgstr "Content installation plan"
+
+msgid "内容管理"
+msgstr "Content"
+
+msgid "泥土"
+msgstr "Dirt"
+
+msgid "你的下一段冒险"
+msgstr "Your next adventure"
+
+msgid "配置"
+msgstr "Configure"
+
+msgid "匹配加载器"
+msgstr "Match loader"
+
+msgid "匹配游戏版本"
+msgstr "Match game version"
+
+msgid "启动服务端"
+msgstr "Start server"
+
+msgid "启动后，节点会将公开端口转发到指定的本地游戏端口。FRP 与游戏、服务端独立启停；令牌保存在系统安全存储中。"
+msgstr "The relay forwards its public port to the local game port. FRP starts and stops independently of games and servers. Tokens use system secure storage."
+
+msgid "启动进程不等于已进入世界。取消运行中的游戏会请求正常退出，并等待游戏结束。"
+msgstr "A running process does not confirm entry into a world. Cancelling requests a normal game exit and waits for it to finish."
+
+msgid "启动配置"
+msgstr "Launch settings"
+
+msgid "启动所选游戏并加入"
+msgstr "Launch game and join"
+
+msgid "启动游戏"
+msgstr "Play"
+
+msgid "浅色玻璃"
+msgstr "Light glass"
+
+msgid "请求游戏正常退出"
+msgstr "Request normal game exit"
+
+msgid "请先选择 AmberL 创建的游戏。已有备份和移除记录可在右侧查看。"
+msgstr "Select an AmberL-created game. Existing backups and removed games are on the recovery tab."
+
+msgid "请先选择兼容的 java.exe"
+msgstr "Select a compatible java.exe first"
+
+msgid "取消当前操作"
+msgstr "Cancel operation"
+
+msgid "全部版本"
+msgstr "All versions"
+
+msgid "人数上限"
+msgstr "Player limit"
+
+msgid "任务"
+msgstr "Tasks"
+
+msgid "任务记录"
+msgstr "Task log"
+
+msgid "上一步"
+msgstr "Back"
+
+msgid "设置"
+msgstr "Settings"
+
+msgid "深色玻璃"
+msgstr "Dark glass"
+
+msgid "实例显示名称"
+msgstr "Instance display name"
+
+msgid "实例与备份"
+msgstr "Instances and backups"
+
+msgid "使用游戏页所选版本、账户和启动配置。请与房主保持版本和模组一致；状态响应不代表已登录或进入世界。"
+msgstr "Uses the game, account and launch settings selected on Games. Match the host's version and mods. A status response does not confirm sign-in or world entry."
+
+msgid "视距"
+msgstr "View distance"
+
+msgid "输入单行服务端命令，例如 list"
+msgstr "Enter one server command, such as list"
+
+msgid "刷新"
+msgstr "Refresh"
+
+msgid "搜索"
+msgstr "Search"
+
+msgid "搜索 Modrinth"
+msgstr "Search Modrinth"
+
+msgid "搜索版本，例如 1.21.1"
+msgstr "Search versions, e.g. 1.21.1"
+
+msgid "搜索内容"
+msgstr "Search content"
+
+msgid "搜索游戏版本"
+msgstr "Search game versions"
+
+msgid "添加游戏库"
+msgstr "Add library"
+
+msgid "填入房间地址"
+msgstr "Use room address"
+
+msgid "填写 .minecraft 或 AmberL 安装目录。只保存位置，不移动、删除或导入原文件。"
+msgstr "Enter a .minecraft or AmberL game folder. Only its location is saved; original files are not moved, deleted or imported."
+
+msgid "铁镐"
+msgstr "Pickaxe"
+
+msgid "铁砧"
+msgstr "Anvil"
+
+msgid "停止 FRP"
+msgstr "Stop FRP"
+
+msgid "停止服务端后备份整个世界与组件。恢复会创建新服务端，保留原世界。"
+msgstr "Stop the server to back up its world and components. Restore creates a new server and preserves the original."
+
+msgid "图标"
+msgstr "Icon"
+
+msgid "土方块"
+msgstr "Dirt"
+
+msgid "退出所选账户"
+msgstr "Sign out selected account"
+
+msgid "退出只移除本机登录信息，不退出已经运行的游戏。"
+msgstr "Sign-out removes local sign-in details. Games already running remain open."
+
+msgid "外观"
+msgstr "Appearance"
+
+msgid "外观会保存在 AmberL 中，下次打开自动恢复。账户和每个游戏的启动配置独立保存。"
+msgstr "AmberL remembers this appearance. Accounts and per-game launch settings are stored separately."
+
+msgid "完整备份"
+msgstr "Full backup"
+
+msgid "微软设备登录信息"
+msgstr "Microsoft device sign-in details"
+
+msgid "微软账户"
+msgstr "Microsoft account"
+
+msgid "为当前游戏保存 Java、账户选择和内存，重新打开后恢复。"
+msgstr "Save this game's Java, account and memory choices for the next launch."
+
+msgid "我的独立服务端"
+msgstr "My servers"
+
+msgid "我的游戏"
+msgstr "My games"
+
+msgid "我已阅读并同意 Minecraft EULA"
+msgstr "I have read and accept the Minecraft EULA"
+
+msgid "下一步 · 名称与位置"
+msgstr "Next · Name and location"
+
+msgid "下一步 · 组件"
+msgstr "Next · Loader"
+
+msgid "下载 FRP 组件"
+msgstr "Download FRP"
+
+msgid "下载并安装"
+msgstr "Download and install"
+
+msgid "下载并创建服务端"
+msgstr "Download and create server"
+
+msgid "下载官方 Java"
+msgstr "Download official Java"
+
+msgid "下载联机组件"
+msgstr "Download room component"
+
+msgid "下载联机组件后即可创建和加入房间"
+msgstr "Download the component to create or join rooms"
+
+msgid "显示名称"
+msgstr "Display name"
+
+msgid "校验 FRP 组件"
+msgstr "Verify FRP"
+
+msgid "校验并恢复"
+msgstr "Verify and restore"
+
+msgid "校验并恢复为新游戏"
+msgstr "Verify and restore as new game"
+
+msgid "新安装文件夹名称"
+msgstr "New installation folder name"
+
+msgid "新的文件夹名称"
+msgstr "New folder name"
+
+msgid "需要先在启动配置中选择匹配的 Java。旧式 Forge 安装器暂不支持。"
+msgstr "Select matching Java in launch settings first. Legacy Forge installers are not supported."
+
+msgid "选择 Java"
+msgstr "Choose Java"
+
+msgid "选择备份 · 恢复为新服务端"
+msgstr "Choose backup · restore as new server"
+
+msgid "选择一个加载器，或保留原版。列表来自对应项目的官方来源。"
+msgstr "Choose a loader or keep Vanilla. Versions come from the project's official source."
+
+msgid "邀请房间"
+msgstr "Rooms"
+
+msgid "邀请含加入密钥，24 小时有效，仅发给信任的朋友。关闭房间立即断开转发。"
+msgstr "Invitations contain a join key and expire after 24 hours. Share only with trusted friends. Closing the room stops forwarding."
+
+msgid "移除（可恢复）"
+msgstr "Remove (recoverable)"
+
+msgid "移除所选服务端（可恢复）"
+msgstr "Remove server (recoverable)"
+
+msgid "移除游戏（可恢复）"
+msgstr "Remove game (recoverable)"
+
+msgid "移除只隐藏游戏并保留全部文件。完整备份最多 16 GiB，包含存档、配置和安装资源；请先关闭游戏。"
+msgstr "Removal hides the game and preserves its files. Full backups include saves, settings and installation files, up to 16 GiB. Close the game first."
+
+msgid "已安装与恢复"
+msgstr "Installed and recovery"
+
+msgid "已选择 Java"
+msgstr "Java selected"
+
+msgid "已选择 Minecraft "
+msgstr "Selected Minecraft "
+
+msgid "已移除的服务端 · 数据仍保留"
+msgstr "Removed servers · files retained"
+
+msgid "已移除的游戏"
+msgstr "Removed games"
+
+msgid "游戏"
+msgstr "Games"
+
+msgid "游戏版本与加载器"
+msgstr "Game version and loader"
+
+msgid "游戏恢复父目录"
+msgstr "Game restore parent folder"
+
+msgid "游戏恢复文件夹名称"
+msgstr "Game restore folder name"
+
+msgid "游戏库完整路径"
+msgstr "Full library path"
+
+msgid "游戏名称"
+msgstr "Game name"
+
+msgid "游戏显示名称"
+msgstr "Game display name"
+
+msgid "游戏运行中"
+msgstr "Game running"
+
+msgid "预览版本与依赖"
+msgstr "Preview version and dependencies"
+
+msgid "原版"
+msgstr "Vanilla"
+
+msgid "阅读 EULA"
+msgstr "Read EULA"
+
+msgid "粘贴 AmberL 邀请 · 需先在邀请房间页下载联机组件"
+msgstr "Paste an AmberL invitation · download the room component first"
+
+msgid "正式版"
+msgstr "Releases"
+
+msgid "正在处理…"
+msgstr "Working…"
+
+msgid "正在读取官方版本列表…"
+msgstr "Loading official versions…"
+
+msgid "正在读取兼容版本…"
+msgstr "Loading compatible versions…"
+
+msgid "只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"
+msgstr "Launch requires a complete AmberL-created installation. Files, account and Java are checked again before launch. External libraries remain read-only."
+
+msgid "重新读取"
+msgstr "Reload"
+
+msgid "资源包"
+msgstr "Resource packs"
+
+msgid "最大化或还原"
+msgstr "Maximize or restore"
+
+msgid "最大内存"
+msgstr "Maximum memory"
+
+msgid "最大内存（MiB）"
+msgstr "Maximum memory (MiB)"
+
+msgid "最小化"
+msgstr "Minimize"
+
+msgid "AmberL · 开发预览"
+msgstr "AmberL · Development preview"
+
+msgid "AmberL · 原生桌面开发预览\nAmbrum Rust 核心 / MPL-2.0\n沿用 AMBER 图形标志，青绿色为 AmberL 识别色。\nSlint 为当前界面实现，最终框架验收尚未完成。"
+msgstr "AmberL · Native desktop preview\nAmbrum Rust core / MPL-2.0\nAMBER graphic mark with AmberL teal accents.\nSlint is the current UI; final framework acceptance is pending."
+
+msgid "EasyTier 2.6.4 · 运行前校验"
+msgstr "EasyTier 2.6.4 · verified before running"
+
+msgid "EasyTier 连接节点"
+msgstr "EasyTier relay"
+
+msgid "FRP 节点地址"
+msgstr "FRP relay address"
+
+msgid "FRP 节点令牌"
+msgstr "FRP relay token"
+
+msgid "FRP 节点证书"
+msgstr "FRP relay certificate"
+
+msgid "Java 可执行文件"
+msgstr "Java executable"
+
+msgid "Java 可执行文件（java.exe）"
+msgstr "Java executable (java.exe)"
+
+msgid "JAVA 运行环境"
+msgstr "JAVA RUNTIME"

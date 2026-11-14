@@ -11,7 +11,7 @@ is not user acceptance or authorization to merge/publish. Baseline: `452c161`.
 | Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices and broader GUI acceptance |
 | Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection; Java 8 old server and Java 25 Forge worlds | Additional runtime variants and game/UI acceptance |
 | Libraries and data | Multi-library read-only registration, new isolated installs; owned-instance naming/icons, full snapshots/new-copy restore and recoverable removal | Shared/unknown capability rules and broader imported-library support |
-| Desktop | Frameless glass, version list, saved per-game choices, persistent light/dark appearance | Final framework comparison decision, Chinese/English, full keyboard/IME/Narrator/DPI acceptance |
+| Desktop | Frameless glass, version list, saved per-game choices, persistent light/dark appearance and Chinese/English UI | Final framework comparison decision, broader diagnostic localization, full keyboard/IME/Narrator/DPI acceptance |
 | Delivery | Exact-source ZIP, checksums/notices, Draft PR and CI; per-user installer with actual install/upgrade/launch/uninstall/data-retention verification | Update channel, clean-machine startup, release documentation |
 | Product acceptance | Disposable local fixtures and user feedback | Same-condition AMBER comparison, two-device and user task acceptance |
 
@@ -62,3 +62,10 @@ Development evidence (each package/PR pins its tested revision):
   immutable installation verification. Actual restored Fabric client displayed 51 mods
   and exited normally. Native naming/icons, recoverable removal and restore inspected;
   see INSTANCE-RECOVERY.md for limits. 123 workspace tests pass for this development slice.
+- Chinese/English UI now switches immediately with restart persistence. English
+  account/configuration/installation/multiplayer screens and Chinese user-created
+  names inspected at 1002 × 702; actual English Paper catalog retrieval passed.
+  Fixed truncated action labels and a busy-state cancel button escaping the dialog.
+  Theme-only configuration upgrade, independent preference saves and corrupt-file
+  preservation passed. Raw logs/provider errors and some diagnostics retain their
+  original language; broader localization/accessibility acceptance remains open.

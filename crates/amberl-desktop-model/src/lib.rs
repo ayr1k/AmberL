@@ -139,7 +139,10 @@ impl Model {
         ambrum::preferences::appearance(&self.app)
     }
     pub fn save_appearance(&mut self, light: bool) -> Result<()> {
-        ambrum::preferences::save_appearance(&self.app, ambrum::preferences::Appearance { light })
+        ambrum::preferences::save_theme(&self.app, light)
+    }
+    pub fn save_language(&mut self, english: bool) -> Result<()> {
+        ambrum::preferences::save_language(&self.app, english)
     }
     pub fn new(app: PathBuf) -> Self {
         let saved = ambrum::preferences::load(&app);

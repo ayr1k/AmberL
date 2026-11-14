@@ -7,7 +7,9 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
 #[path = "../glass.rs"]
 mod glass;
-slint::slint! { export { Launcher, GameRow, GlassAssets, VersionRow, OptionalRow } from "ui/launcher.slint"; }
+#[path = "../i18n.rs"]
+mod i18n;
+slint::include_modules!();
 
 #[derive(Default)]
 struct View {
@@ -61,6 +63,8 @@ fn filter_versions(ui: &Launcher, model: &Model) {
     )));
 }
 fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
+    let english = ui.global::<Locale>().get_english();
+    let tr = |value: &str| -> SharedString { i18n::message(english, value).into() };
     if view.revision == model.revision && view.network_revision == model.network.revision {
         return;
     }
@@ -133,13 +137,16 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
             ui.set_content_step(if c.plan.is_some() { 1 } else { 0 });
             view.content_plan = c.planned_version.clone();
         }
-        ui.set_content_target(c.title.as_str().into());
+        ui.set_content_target(i18n::content_target(english, &c.title).into());
         ui.set_content_group_states(strings(c.groups.iter().map(|g| g.state.clone()).collect()));
         ui.set_content_projects(strings(
             c.projects.iter().map(|p| p.title.clone()).collect(),
         ));
         ui.set_content_versions(strings(
-            c.versions.iter().map(|v| v.title.clone()).collect(),
+            c.versions
+                .iter()
+                .map(|v| i18n::subtitle(english, &v.title))
+                .collect(),
         ));
         ui.set_content_groups(strings(
             c.groups
@@ -148,18 +155,28 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                     format!(
                         "{} · {}",
                         g.title,
-                        match g.state.as_str() {
-                            "installed" => "已安装",
-                            "pending" => "安装未完成",
-                            "removing" => "移除未完成",
-                            "removed" => "已移除，可恢复",
-                            _ => "恢复未完成",
-                        }
+                        i18n::text(
+                            english,
+                            match g.state.as_str() {
+                                "installed" => "已安装",
+                                "pending" => "安装未完成",
+                                "removing" => "移除未完成",
+                                "removed" => "已移除，可恢复",
+                                _ => "恢复未完成",
+                            }
+                        )
                     )
                 })
                 .collect(),
         ));
-        ui.set_content_preview(c.preview().into());
+        ui.set_content_preview(
+            c.preview()
+                .lines()
+                .map(|line| i18n::text(english, line))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into(),
+        );
         ui.set_content_optional(ModelRc::new(VecModel::from(c.plan.as_ref().map_or_else(
             Vec::new,
             |p| {
@@ -192,7 +209,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         let n = &model.network;
         ui.set_frp_active(n.frp_active());
         ui.set_frp_ready(n.frp_component);
-        ui.set_frp_status(n.frp_status.as_str().into());
+        ui.set_frp_status(tr(&n.frp_status));
         if n.frp_revision != view.frp_revision {
             if let Some(c) = &n.frp_config {
                 ui.set_frp_server(c.server.text().into());
@@ -256,7 +273,9 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                         "{} · {} {} · :{} · {}",
                         s.name,
                         s.version,
-                        s.loader.as_ref().map_or("原版", |l| l.choice.kind.as_str()),
+                        s.loader
+                            .as_ref()
+                            .map_or(i18n::text(english, "原版"), |l| l.choice.kind.as_str()),
                         s.port,
                         &s.id[..6]
                     )
@@ -272,10 +291,10 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         ui.set_server_active(n.server_active());
         ui.set_room_active(n.room_active());
         ui.set_network_busy(n.busy());
-        ui.set_network_status(n.status.as_str().into());
-        ui.set_server_status(n.server_status.as_str().into());
-        ui.set_room_status(n.room_status.as_str().into());
-        ui.set_query_status(n.query_status.as_str().into());
+        ui.set_network_status(tr(&n.status));
+        ui.set_server_status(tr(&n.server_status));
+        ui.set_room_status(tr(&n.room_status));
+        ui.set_query_status(tr(&n.query_status));
         ui.set_server_log(n.log().into());
         ui.set_room_invite(n.invite.as_str().into());
         ui.set_component_ready(n.component);
@@ -290,7 +309,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                 .map(|g| GameRow {
                     id: g.id.as_str().into(),
                     title: g.title.as_str().into(),
-                    subtitle: g.subtitle.as_str().into(),
+                    subtitle: i18n::subtitle(english, &g.subtitle).into(),
                     icon: g.icon.as_str().into(),
                 })
                 .collect::<Vec<_>>(),
@@ -302,24 +321,26 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         if index.is_none() {
             view.account = None;
         }
-        let mut accounts = vec!["选择账户".into()];
+        let mut accounts = vec![i18n::text(english, "选择账户").into()];
         accounts.extend(model.accounts.iter().map(|a| a.name.clone()));
         ui.set_account_options(strings(accounts));
         ui.set_account_index(index.map_or(0, |i| i as i32 + 1));
         ui.set_account_label(
             index
-                .map_or("登录微软账户", |i| model.accounts[i].name.as_str())
+                .map_or(i18n::text(english, "登录微软账户"), |i| {
+                    model.accounts[i].name.as_str()
+                })
                 .into(),
         );
         view.data_revision = model.data_revision;
     }
     if view.java_revision != model.java_revision {
-        let mut java = vec!["选择检测到的 Java".into()];
+        let mut java = vec![i18n::text(english, "选择检测到的 Java").into()];
         java.extend(model.java.iter().map(|c| {
             format!(
                 "{} · {}",
                 c.java.as_ref().map_or_else(
-                    || "无法使用".into(),
+                    || i18n::text(english, "无法使用").into(),
                     |j| format!("Java {} ({})", j.version, j.architecture)
                 ),
                 c.executable.display()
@@ -355,22 +376,26 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     ui.set_selected_id(selected.map_or("", |g| g.id.as_str()).into());
     ui.set_game_title(
         selected
-            .map_or("你的下一段冒险", |g| g.title.as_str())
+            .map_or(i18n::text(english, "你的下一段冒险"), |g| {
+                g.title.as_str()
+            })
             .into(),
     );
     ui.set_game_subtitle(
-        selected
-            .map_or("安装游戏，或添加已有游戏库", |g| {
+        i18n::subtitle(
+            english,
+            selected.map_or("安装游戏，或添加已有游戏库", |g| {
                 g.subtitle.as_str()
-            })
-            .into(),
+            }),
+        )
+        .into(),
     );
     ui.set_launch_candidate(selected.is_some_and(|g| g.installation_hint));
     ui.set_busy(model.busy());
     ui.set_running(model.running);
-    ui.set_status(model.status.as_str().into());
+    ui.set_status(tr(&model.status));
     ui.set_task_log(model.log().into());
-    ui.set_device_prompt(model.device_prompt.as_str().into());
+    ui.set_device_prompt(i18n::device_prompt(english, &model.device_prompt).into());
     view.revision = model.revision;
 }
 fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<()> {
@@ -785,7 +810,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     ui.global::<GlassAssets>().set_ready(true);
     let model = Rc::new(RefCell::new(Model::new(app)));
     match model.borrow().appearance() {
-        Ok(saved) => ui.invoke_apply_appearance(saved.light),
+        Ok(saved) => {
+            ui.invoke_apply_appearance(saved.light);
+            slint::select_bundled_translation(if saved.english { "en_US" } else { "" })?;
+            ui.global::<Locale>().set_english(saved.english);
+        }
         Err(error) => eprintln!("Appearance preserved: {error}"),
     }
     {
@@ -806,6 +835,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     content_bindings(&ui, &model);
     maintenance_bindings(&ui, &model);
     let view = Rc::new(RefCell::new(View::default()));
+    {
+        let weak = ui.as_weak();
+        let model = model.clone();
+        let view = view.clone();
+        ui.on_language(move |english| {
+            let result = model.borrow_mut().save_language(english).and_then(|_| {
+                slint::select_bundled_translation(if english { "en_US" } else { "" })
+                    .map_err(|e| e.to_string())
+            });
+            match result {
+                Ok(()) => {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.global::<Locale>().set_english(english);
+                        let mut view = view.borrow_mut();
+                        view.revision = 0;
+                        view.data_revision = 0;
+                        view.java_revision = 0;
+                        view.network_revision = 0;
+                        view.content_revision = 0;
+                        refresh(&ui, &model.borrow(), &mut view);
+                    }
+                }
+                Err(error) => model.borrow_mut().report(error),
+            }
+        });
+    }
     let os = windows_version();
     network_callbacks(&ui, &model);
     {

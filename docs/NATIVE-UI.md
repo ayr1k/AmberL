@@ -94,3 +94,19 @@ Light mode uses dark text, themed native inputs and visible keyboard focus.
 顶部 **设置** 管理应用外观，底部 **配置** 管理当前游戏。浅色与深色玻璃即时切换，
 下次启动恢复上次选择。版本列表已实际验证 Tab 导航和回车选择；这不等于完整的
 读屏、中文输入法预编辑或跨屏 DPI 验收。
+
+## Language / 语言
+
+Settings offers **简体中文 / English** with immediate switching and independent
+theme/language persistence. English UI translations are bundled at build time;
+no translation service or runtime download is used. Existing theme-only preferences
+remain readable. Game/server names, paths, version identities and provider titles
+are preserved. Loader selection uses canonical identities rather than translated labels.
+
+设置中的语言按钮可即时切换中英文，下次启动恢复选择。主界面、安装向导、账户、
+配置、内容与联机表单及常见状态已翻译；游戏日志、第三方错误和部分底层诊断
+保留原文，不能将这次交付描述为所有诊断信息均已完成本地化。
+
+The English install wizard and multiplayer forms were inspected at 1002 × 702;
+real Paper catalog retrieval confirms translated loader labels still select the
+intended provider. This is not full Narrator, IME or cross-monitor acceptance.

@@ -81,19 +81,46 @@ pub fn save(app: &Path, id: &str, preference: Launch) -> Result<()> {
 #[serde(deny_unknown_fields)]
 pub struct Appearance {
     pub light: bool,
+    #[serde(default)]
+    pub english: bool,
+}
+pub fn save_theme(app: &Path, light: bool) -> Result<()> {
+    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
+    doc.data.light = light;
+    doc.save()
+}
+pub fn save_language(app: &Path, english: bool) -> Result<()> {
+    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
+    doc.data.english = english;
+    doc.save()
 }
 pub fn appearance(app: &Path) -> Result<Appearance> {
     Ok(Document::<Appearance>::open(app, "appearance-v1.json")?.data)
-}
-pub fn save_appearance(app: &Path, appearance: Appearance) -> Result<()> {
-    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
-    doc.data = appearance;
-    doc.save()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn appearance_upgrade_preserves_other_choice_and_rejects_corruption() {
+        let p = std::env::temp_dir().join(format!(
+            "amberl-appearance-{}",
+            crate::registry::new_id().unwrap()
+        ));
+        std::fs::create_dir(&p).unwrap();
+        let file = p.join("appearance-v1.json");
+        std::fs::write(&file, br#"{"light":true}"#).unwrap();
+        assert!(!appearance(&p).unwrap().english);
+        save_language(&p, true).unwrap();
+        assert!(appearance(&p).unwrap().light);
+        save_theme(&p, false).unwrap();
+        assert!(appearance(&p).unwrap().english);
+        assert!(!appearance(&p).unwrap().light);
+        std::fs::write(&file, b"broken").unwrap();
+        assert!(save_language(&p, false).is_err());
+        assert!(save_theme(&p, true).is_err());
+        assert_eq!(std::fs::read(file).unwrap(), b"broken");
+    }
     #[test]
     fn roundtrip_does_not_erase_other_games_or_accept_bad_memory() {
         let p = std::env::temp_dir().join(format!(
