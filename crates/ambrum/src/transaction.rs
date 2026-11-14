@@ -57,6 +57,8 @@ struct Record {
     path: String,
     bytes: u64,
     sha256: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    mutable: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -296,6 +298,7 @@ impl Stage {
             path: path.into(),
             bytes: total,
             sha256: hash.finish()?,
+            mutable: false,
         })
     }
     pub(crate) fn write(
@@ -327,6 +330,21 @@ impl Stage {
             return Err("Installation journal exceeds limit".into());
         }
         self.write_inner(READY, &mut bytes.as_slice(), bytes.len() as u64, cancel)?;
+        Ok(())
+    }
+    /// Restored gameplay data is verified at commit, then remains writable during play.
+    pub(crate) fn write_mutable(
+        &mut self,
+        path: &str,
+        input: &mut impl Read,
+        size: u64,
+        cancel: &Cancellation,
+    ) -> Result<()> {
+        self.write(path, input, size, cancel)?;
+        self.records
+            .last_mut()
+            .ok_or("Missing restore record")?
+            .mutable = true;
         Ok(())
     }
     pub(crate) fn commit(mut self, cancel: &Cancellation) -> Result<PathBuf> {

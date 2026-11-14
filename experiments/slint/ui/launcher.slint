@@ -143,6 +143,19 @@ export component Launcher inherits Window {
     in property <bool> content-server;
     in-out property <bool> content-match-game: true;
     in-out property <bool> content-match-loader: true;
+    in property <bool> maintenance-has-target;
+    in property <string> maintenance-target;
+    in-out property <string> maintenance-name;
+    in-out property <int> maintenance-icon: 0;
+    in-out property <int> maintenance-tab: 0;
+    in property <[string]> client-backups;
+    in property <[string]> archived-games;
+    in-out property <int> client-backup-index: -1;
+    in-out property <int> archived-game-index: -1;
+    in-out property <string> client-restore-parent;
+    in-out property <string> client-restore-name: "recovered-game";
+    callback open-maintenance(); callback save-instance(); callback archive-instance();
+    callback backup-instance(); callback restore-instance(); callback unarchive-instance();
     in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
     in property <[string]> content-group-states;
     in property <[OptionalRow]> content-optional;
@@ -222,7 +235,7 @@ export component Launcher inherits Window {
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: #10232dde;
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
-                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : root.panel == 8 ? "内容管理" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
+                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : root.panel == 8 ? "内容管理" : root.panel == 9 ? "实例与备份" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
                     Action { width: 100px; label: root.panel == 8 && root.content-server ? "返回联机" : "返回游戏"; clicked => { root.panel=root.panel == 8 && root.content-server ? 6 : 0; } }
                 }
                 if root.panel == 1: VerticalLayout {
@@ -259,6 +272,7 @@ export component Launcher inherits Window {
                         Button { text: "保存启动配置"; enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
                     }
                     Text { vertical-stretch: 0; text: "只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"; color: #aab8ba; wrap: word-wrap; }
+                    Action { height: 40px; label: "实例与备份"; enabled: !root.busy; clicked => { root.open-maintenance(); } }
                 }
                 if root.panel == 3: VerticalLayout {
                     spacing: 18px;
@@ -514,6 +528,36 @@ export component Launcher inherits Window {
                     HorizontalLayout { height: 40px; spacing: 12px;
                         ComboBox { model: root.archived-options; current-index <=> root.archived-index; enabled: !root.network-busy; }
                         Action { width: 140px; label: "恢复到列表"; enabled: !root.network-busy && root.archived-index >= 0 && root.archived-index < root.archived-options.length; clicked => { root.restore-archived(); } }
+                    }
+                }
+                if root.panel == 9: VerticalLayout { spacing: 14px; vertical-stretch: 0;
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Action { label: "当前实例"; selected: root.maintenance-tab == 0; clicked => { root.maintenance-tab=0; } }
+                        Action { label: "备份与恢复"; selected: root.maintenance-tab == 1; clicked => { root.maintenance-tab=1; } }
+                    }
+                    if root.maintenance-tab == 0: VerticalLayout { spacing: 14px;
+                        Text { text: root.maintenance-has-target ? root.maintenance-target : "请先选择 AmberL 创建的游戏。已有备份和移除记录可在右侧查看。"; wrap: word-wrap; color: #a7d8ca; }
+                        Text { text: "显示名称"; color: #d9e2e0; }
+                        LineEdit { height: 40px; text <=> root.maintenance-name; accessible-label: "实例显示名称"; enabled: !root.busy && root.maintenance-has-target; }
+                        Text { text: "图标"; color: #d9e2e0; }
+                        ComboBox { model: ["草方块", "泥土", "铁砧", "镐"]; current-index <=> root.maintenance-icon; enabled: !root.busy && root.maintenance-has-target; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: "保存名称与图标"; enabled: !root.busy && root.maintenance-has-target; clicked => { root.save-instance(); } }
+                            Action { label: "创建完整备份"; enabled: !root.busy && root.maintenance-has-target; clicked => { root.backup-instance(); } }
+                        }
+                        Action { height: 40px; label: "移除游戏（可恢复）"; enabled: !root.busy && root.maintenance-has-target; clicked => { root.archive-instance(); } }
+                        Text { text: "移除只隐藏游戏并保留全部文件。完整备份最多 16 GiB，包含存档、配置和安装资源；请先关闭游戏。"; wrap: word-wrap; color: #becacb; font-size: 13px; }
+                    }
+                    if root.maintenance-tab == 1: VerticalLayout { spacing: 12px;
+                        Text { text: "完整备份"; color: #d9e2e0; }
+                        ComboBox { model: root.client-backups; current-index <=> root.client-backup-index; enabled: !root.busy; }
+                        LineEdit { height: 40px; text <=> root.client-restore-parent; placeholder-text: "恢复父目录（已存在的独立目录）"; accessible-label: "游戏恢复父目录"; enabled: !root.busy; }
+                        LineEdit { height: 40px; text <=> root.client-restore-name; placeholder-text: "新的文件夹名称"; accessible-label: "游戏恢复文件夹名称"; enabled: !root.busy; }
+                        Action { height: 40px; label: "校验并恢复为新游戏"; enabled: !root.busy && root.client-backups.length > 0 && root.client-backup-index >= 0 && root.client-restore-parent != "" && root.client-restore-name != ""; clicked => { root.restore-instance(); } }
+                        Text { text: "已移除的游戏"; color: #d9e2e0; }
+                        ComboBox { model: root.archived-games; current-index <=> root.archived-game-index; enabled: !root.busy; }
+                        Action { height: 40px; label: "恢复显示"; enabled: !root.busy && root.archived-games.length > 0 && root.archived-game-index >= 0; clicked => { root.unarchive-instance(); } }
+                        Text { text: "恢复会创建独立副本，不覆盖原游戏。损坏或同名冲突会停止恢复并保留现场。"; wrap: word-wrap; color: #becacb; font-size: 13px; }
                     }
                 }
                 if root.panel == 8: VerticalLayout { spacing: 12px; vertical-stretch: 0;

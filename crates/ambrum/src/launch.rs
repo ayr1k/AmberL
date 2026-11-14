@@ -116,6 +116,7 @@ fn prepare(selection: &Selection<'_>, cancel: &Cancellation) -> Result<Prepared>
         &resolved.metadata_path,
     )?;
     let mut installed = Installed::open(selection.game_directory, cancel)?;
+    crate::maintenance::ready(selection.app_directory, &installed.root)?;
     let installed_metadata =
         installed.json(&format!("versions/{0}/{0}.json", selection.version))?;
     crate::loader::verify_metadata(&metadata, &installed_metadata)?;

@@ -61,11 +61,15 @@ impl Installed {
             cancel.check()?;
             relative_path(&record.path)?;
             if record.path.eq_ignore_ascii_case(READY)
+                || record.path.eq_ignore_ascii_case(PENDING) && record.mutable
                 || !seen.insert(record.path.to_lowercase())
                 || record.bytes > 16 * 1024 * 1024 * 1024
                 || record.sha256.len() != 64
             {
                 return Err("Invalid installed resource record".into());
+            }
+            if record.mutable {
+                continue;
             }
             if let Some((parent, _)) = record.path.rsplit_once('/')
                 && !directories.contains_key(parent)
@@ -111,6 +115,9 @@ impl Installed {
             return Err("Installed metadata exceeds limit".into());
         }
         serde_json::from_slice(&data).map_err(|_| "Invalid installed metadata".into())
+    }
+    pub(crate) fn immutable_paths(&self) -> BTreeSet<String> {
+        self.files.keys().cloned().collect()
     }
     pub(crate) fn verify_official(
         &mut self,

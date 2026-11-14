@@ -21,6 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 pub mod content;
+pub mod maintenance;
 pub mod network;
 
 #[derive(Clone, Debug)]
@@ -70,6 +71,7 @@ impl LaunchChoice {
     }
 }
 enum Message {
+    Maintenance(maintenance::Response),
     Content(content::Response),
     Data(Vec<Game>, Vec<Profile>),
     Java(Vec<Candidate>),
@@ -81,6 +83,7 @@ enum Message {
     Finished(Result<()>),
 }
 enum Operation {
+    Maintenance(maintenance::Request),
     Content(content::Request),
     Reload,
     Catalog,
@@ -126,6 +129,7 @@ pub struct Model {
     pub running: bool,
     pub network: network::Network,
     pub content: content::Content,
+    pub maintenance: maintenance::Maintenance,
     pub preferences: std::collections::BTreeMap<String, ambrum::preferences::Launch>,
     worker: Option<Worker>,
     log: VecDeque<String>,
@@ -137,6 +141,7 @@ impl Model {
         Self {
             network: network::Network::new(app.clone()),
             content: content::Content::default(),
+            maintenance: maintenance::Maintenance::default(),
             app,
             games: vec![],
             accounts: vec![],
@@ -348,6 +353,15 @@ impl Model {
                 }
             };
             match message {
+                Message::Maintenance(response) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.maintenance.backups = response.backups;
+                    self.maintenance.archived = response.archived;
+                    self.maintenance.revision += 1;
+                    self.revision += 1;
+                }
                 Message::Content(response) => {
                     if worker.cancel.check().is_err() {
                         continue;
@@ -360,6 +374,11 @@ impl Model {
                         continue;
                     }
                     self.games = games;
+                    if let Some(target) = &self.maintenance.target {
+                        self.maintenance.target =
+                            self.games.iter().find(|g| g.id == target.id).cloned();
+                        self.maintenance.revision += 1;
+                    }
                     self.accounts = accounts;
                     if !self
                         .games
@@ -446,6 +465,7 @@ fn reload(
 ) -> Result<()> {
     let registry = Registry::open(app)?;
     let mut games = Vec::new();
+    let profiles = ambrum::maintenance::profiles(app)?;
     if registry.entries().len() > 64 {
         send(
             sender,
@@ -456,6 +476,10 @@ fn reload(
         cancel.check()?;
         match registry.scan(&entry.id, cancel) {
             Ok(scan) => {
+                let profile = ambrum::maintenance::matching(&profiles, &entry.path)?;
+                if profile.is_some_and(|p| p.archived) {
+                    continue;
+                }
                 for instance in scan.instances.into_iter().take(20000 - games.len()) {
                     let hint = entry.path.join("installation.ready.json").is_file();
                     let metadata = ambrum::paths::json(
@@ -468,12 +492,14 @@ fn reload(
                     )
                     .ok();
                     let display = metadata.as_ref().and_then(|m| m.get("amberlDisplay"));
-                    let title = display
-                        .and_then(|d| d["name"].as_str())
+                    let title = profile
+                        .map(|p| p.title.as_str())
+                        .or_else(|| display.and_then(|d| d["name"].as_str()))
                         .unwrap_or(&instance.name)
                         .to_owned();
-                    let icon = display
-                        .and_then(|d| d["icon"].as_str())
+                    let icon = profile
+                        .map(|p| p.icon.as_str())
+                        .or_else(|| display.and_then(|d| d["icon"].as_str()))
                         .filter(|i| ["grass", "dirt", "anvil", "pickaxe"].contains(i))
                         .unwrap_or("grass")
                         .to_owned();
@@ -527,6 +553,7 @@ fn execute(
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
     match operation {
+        Operation::Maintenance(request) => maintenance::execute(app, request, cancel, sender),
         Operation::Reload => reload(app, cancel, sender),
         Operation::Catalog => send(
             sender,

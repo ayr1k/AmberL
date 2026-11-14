@@ -23,6 +23,7 @@ struct View {
     backup_ids: Vec<String>,
     archived_ids: Vec<String>,
     content_revision: u64,
+    maintenance_revision: u64,
     content_projects: Vec<String>,
     content_versions: Vec<String>,
     content_groups: Vec<String>,
@@ -62,6 +63,45 @@ fn filter_versions(ui: &Launcher, model: &Model) {
 fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     if view.revision == model.revision && view.network_revision == model.network.revision {
         return;
+    }
+    if view.maintenance_revision != model.maintenance.revision {
+        let m = &model.maintenance;
+        ui.set_maintenance_has_target(m.target.is_some());
+        ui.set_maintenance_target(
+            m.target
+                .as_ref()
+                .map_or("".into(), |g| format!("{} · {}", g.title, g.version).into()),
+        );
+        ui.set_maintenance_name(
+            m.target
+                .as_ref()
+                .map_or("".into(), |g| g.title.as_str().into()),
+        );
+        ui.set_maintenance_icon(
+            m.target
+                .as_ref()
+                .and_then(|g| {
+                    ["grass", "dirt", "anvil", "pickaxe"]
+                        .iter()
+                        .position(|i| *i == g.icon)
+                })
+                .unwrap_or(0) as i32,
+        );
+        ui.set_client_backups(strings(
+            m.backups
+                .iter()
+                .map(|b| format!("{} · {} · {}", b.title, b.version, &b.id[..8]))
+                .collect(),
+        ));
+        ui.set_archived_games(strings(
+            m.archived
+                .iter()
+                .map(|p| format!("{} · {}", p.title, p.version))
+                .collect(),
+        ));
+        ui.set_client_backup_index(-1);
+        ui.set_archived_game_index(-1);
+        view.maintenance_revision = m.revision;
     }
     if view.content_revision != model.content.revision {
         let c = &model.content;
@@ -406,6 +446,59 @@ fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
         });
     }
 }
+fn maintenance_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
+    let weak = ui.as_weak();
+    let m = model.clone();
+    ui.on_open_maintenance(move || {
+        if let Some(u) = weak.upgrade() {
+            let result = m.borrow_mut().open_maintenance();
+            match result {
+                Ok(()) => {
+                    u.set_maintenance_tab(0);
+                    u.set_panel(9);
+                }
+                Err(e) => m.borrow_mut().report(e),
+            }
+        }
+    });
+    macro_rules! action {
+        ($callback:ident,$f:expr) => {{
+            let weak = ui.as_weak();
+            let model = model.clone();
+            ui.$callback(move || {
+                if let Some(u) = weak.upgrade() {
+                    operation(&model, |m| $f(&u, m));
+                }
+            });
+        }};
+    }
+    let edit = |u: &Launcher, m: &mut Model, archived: bool| {
+        let icon = ["grass", "dirt", "anvil", "pickaxe"]
+            .get(usize::try_from(u.get_maintenance_icon()).map_err(|_| "请选择图标")?)
+            .ok_or("请选择图标")?;
+        m.edit_instance(
+            u.get_maintenance_name().to_string(),
+            (*icon).into(),
+            archived,
+        )
+    };
+    action!(on_save_instance, |u: &Launcher, m: &mut Model| edit(
+        u, m, false
+    ));
+    action!(on_archive_instance, |u: &Launcher, m: &mut Model| edit(
+        u, m, true
+    ));
+    action!(on_backup_instance, |_: &Launcher, m: &mut Model| m
+        .backup_instance());
+    action!(on_unarchive_instance, |u: &Launcher, m: &mut Model| m
+        .unarchive_instance(u.get_archived_game_index()));
+    action!(on_restore_instance, |u: &Launcher, m: &mut Model| m
+        .restore_instance(
+            u.get_client_backup_index(),
+            u.get_client_restore_parent().as_str().into(),
+            u.get_client_restore_name().to_string()
+        ));
+}
 fn net(
     model: &Rc<RefCell<Model>>,
     f: impl FnOnce(&mut amberl_desktop_model::network::Network) -> ambrum::Result<()>,
@@ -692,6 +785,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     ui.global::<GlassAssets>().set_ready(true);
     let model = Rc::new(RefCell::new(Model::new(app)));
     content_bindings(&ui, &model);
+    maintenance_bindings(&ui, &model);
     let view = Rc::new(RefCell::new(View::default()));
     let os = windows_version();
     network_callbacks(&ui, &model);

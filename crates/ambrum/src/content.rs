@@ -35,6 +35,7 @@ fn lease(app: &Path, target: &Target, c: &Cancellation) -> Result<Lease> {
         Target::Client { root, version } => {
             crate::paths::name(version)?;
             let mut client = Installed::open(root, c)?;
+            crate::maintenance::ready(app, &client.root)?;
             let meta = client.json(&format!("versions/{version}/{version}.json"))?;
             if meta["id"] != version.as_str() {
                 return Err("Game content identity mismatch".into());
