@@ -23,7 +23,13 @@ checked against provider metadata and installed into `plugins`, separately from
 loader mods. LuckPerms 5.5.71 passed actual search, install/remove/restore and
 loading on Paper 26.3 build 249, including world restart and backup restoration.
 Plugin-generated data/configuration are preserved when its managed JAR is removed.
-Additional providers and filter overrides remain open.
+The game-version and loader recommendation filters can be disabled independently
+for discovery and version browsing. Nonmatching versions are explicitly labeled;
+installation planning still rejects incompatible target versions/loaders. The
+provider's project category and client/server boundary remain enforced. A real
+LuckPerms read-only check expanded 1 matching version to 103 versions and rejected
+a mismatched installation plan. This does not provide forced incompatible installs.
+Additional providers remain open.
 
 **Java** can discover local executables or explicitly download an independent Mojang
 runtime. The official manifest and each raw file are checksum-verified; installed

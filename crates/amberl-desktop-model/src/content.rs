@@ -7,6 +7,7 @@ pub struct Content {
     pub target: Option<content::Target>,
     pub context: Option<api::Context>,
     pub kind: String,
+    pub browse: api::Browse,
     pub projects: Vec<api::Project>,
     pub versions: Vec<api::Version>,
     pub groups: Vec<content::Group>,
@@ -16,8 +17,8 @@ pub struct Content {
 }
 pub(super) enum Request {
     Open(content::Target),
-    Search(content::Target, String, String),
-    Versions(content::Target, String, String),
+    Search(content::Target, String, String, api::Browse),
+    Versions(content::Target, String, String, api::Browse),
     Plan(
         content::Target,
         String,
@@ -129,13 +130,20 @@ impl Model {
     fn content_target(&self) -> Result<content::Target> {
         self.content.target.clone().ok_or("请先选择内容目标".into())
     }
-    pub fn search_content(&mut self, kind: String, query: String) -> Result<()> {
+    pub fn search_content(
+        &mut self,
+        kind: String,
+        query: String,
+        browse: api::Browse,
+    ) -> Result<()> {
         self.start(Operation::Content(Request::Search(
             self.content_target()?,
             kind.clone(),
             query,
+            browse,
         )))?;
         self.content.kind = kind;
+        self.content.browse = browse;
         self.content.projects.clear();
         self.content.versions.clear();
         self.content.plan = None;
@@ -153,6 +161,7 @@ impl Model {
             self.content_target()?,
             self.content.kind.clone(),
             p.id.clone(),
+            self.content.browse,
         )))?;
         self.content.versions.clear();
         self.content.plan = None;
@@ -238,32 +247,30 @@ pub(super) fn execute(
     c: &Cancellation,
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
-    let response = match request {
-        Request::Open(t) => {
-            Response::Open(content::context(app, &t, c)?, content::list(app, &t, c)?)
-        }
-        Request::Search(t, kind, query) => Response::Projects(
-            kind.clone(),
-            api::search(&query, &kind, &content::context(app, &t, c)?, c)?,
-        ),
-        Request::Versions(t, kind, id) => Response::Versions(api::versions(
-            &id,
-            &kind,
-            &content::context(app, &t, c)?,
-            c,
-        )?),
-        Request::Plan(t, kind, id, choices) => Response::Plan(
-            id.clone(),
-            api::plan_with_choices(&id, &kind, &content::context(app, &t, c)?, &choices, c)?,
-        ),
-        Request::Install(t, plan) => {
-            content::install(app, &t, &plan, c)?;
-            Response::Groups(content::list(app, &t, c)?)
-        }
-        Request::Change(t, id, action) => {
-            content::change(app, &t, &id, &action, c)?;
-            Response::Groups(content::list(app, &t, c)?)
-        }
-    };
+    let response =
+        match request {
+            Request::Open(t) => {
+                Response::Open(content::context(app, &t, c)?, content::list(app, &t, c)?)
+            }
+            Request::Search(t, kind, query, browse) => Response::Projects(
+                kind.clone(),
+                api::search_with_filters(&query, &kind, &content::context(app, &t, c)?, browse, c)?,
+            ),
+            Request::Versions(t, kind, id, browse) => Response::Versions(
+                api::versions_with_filters(&id, &kind, &content::context(app, &t, c)?, browse, c)?,
+            ),
+            Request::Plan(t, kind, id, choices) => Response::Plan(
+                id.clone(),
+                api::plan_with_choices(&id, &kind, &content::context(app, &t, c)?, &choices, c)?,
+            ),
+            Request::Install(t, plan) => {
+                content::install(app, &t, &plan, c)?;
+                Response::Groups(content::list(app, &t, c)?)
+            }
+            Request::Change(t, id, action) => {
+                content::change(app, &t, &id, &action, c)?;
+                Response::Groups(content::list(app, &t, c)?)
+            }
+        };
     send(sender, Message::Content(response))
 }

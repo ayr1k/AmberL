@@ -14,6 +14,19 @@ pub struct Context {
     pub loader: String,
     pub server: bool,
 }
+#[derive(Clone, Copy, Debug)]
+pub struct Browse {
+    pub game: bool,
+    pub loader: bool,
+}
+impl Default for Browse {
+    fn default() -> Self {
+        Self {
+            game: true,
+            loader: true,
+        }
+    }
+}
 #[derive(Clone, Debug)]
 pub struct Project {
     pub id: String,
@@ -133,10 +146,30 @@ pub fn search(
     context: &Context,
     c: &Cancellation,
 ) -> Result<Vec<Project>> {
+    search_with_filters(query, kind, context, Browse::default(), c)
+}
+fn browse_filters(context: &Context, kind: &str, browse: Browse) -> Result<Vec<Vec<String>>> {
+    let mut rows = filters(context, kind)?;
+    rows.retain(|row| {
+        !row.iter().any(|value| {
+            !browse.game && value.starts_with("versions:")
+                || !browse.loader && value.starts_with("categories:")
+        })
+    });
+    Ok(rows)
+}
+pub fn search_with_filters(
+    query: &str,
+    kind: &str,
+    context: &Context,
+    browse: Browse,
+    c: &Cancellation,
+) -> Result<Vec<Project>> {
     if query.chars().count() > 128 || query.chars().any(char::is_control) {
         return Err("搜索文字过长".into());
     }
-    let f = serde_json::to_string(&filters(context, kind)?).map_err(|e| e.to_string())?;
+    let f = serde_json::to_string(&browse_filters(context, kind, browse)?)
+        .map_err(|e| e.to_string())?;
     let data = get(
         &format!(
             "search?query={}&facets={}&limit=30",
@@ -168,9 +201,20 @@ pub fn search(
         .collect()
 }
 fn catalog(project: &str, kind: &str, context: &Context, c: &Cancellation) -> Result<Vec<Value>> {
+    browse_catalog(project, kind, context, Browse::default(), c)
+}
+fn browse_catalog(
+    project: &str,
+    kind: &str,
+    context: &Context,
+    browse: Browse,
+    c: &Cancellation,
+) -> Result<Vec<Value>> {
     id(project)?;
     filters(context, kind)?;
-    let loaders = if kind == "plugin" {
+    let loaders = if !browse.loader {
+        vec![]
+    } else if kind == "plugin" {
         vec!["paper", "spigot", "bukkit"]
     } else if kind == "mod" {
         vec![context.loader.as_str()]
@@ -179,14 +223,22 @@ fn catalog(project: &str, kind: &str, context: &Context, c: &Cancellation) -> Re
     } else {
         vec!["iris", "optifine"]
     };
-    let value = get(
-        &format!(
-            "project/{project}/version?game_versions={}&loaders={}",
-            encoded(&json!([context.game]).to_string()),
-            encoded(&json!(loaders).to_string())
-        ),
-        c,
-    )?;
+    let mut query = vec![];
+    if browse.game {
+        query.push(format!(
+            "game_versions={}",
+            encoded(&json!([context.game]).to_string())
+        ));
+    }
+    if browse.loader {
+        query.push(format!("loaders={}", encoded(&json!(loaders).to_string())));
+    }
+    let query = if query.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", query.join("&"))
+    };
+    let value = get(&format!("project/{project}/version{query}"), c)?;
     let rows = value.as_array().ok_or("Invalid content versions")?;
     if rows.len() > 4096 {
         return Err("Content version limit".into());
@@ -205,14 +257,32 @@ pub fn versions(
     context: &Context,
     c: &Cancellation,
 ) -> Result<Vec<Version>> {
-    catalog(project, kind, context, c)?
+    versions_with_filters(project, kind, context, Browse::default(), c)
+}
+pub fn versions_with_filters(
+    project: &str,
+    kind: &str,
+    context: &Context,
+    browse: Browse,
+    c: &Cancellation,
+) -> Result<Vec<Version>> {
+    browse_catalog(project, kind, context, browse, c)?
         .iter()
         .map(|v| {
             let version = text(v, "id")?;
             id(&version)?;
             Ok(Version {
                 id: version,
-                title: format!("{} · {}", text(v, "name")?, text(v, "version_type")?),
+                title: format!(
+                    "{} · {}{}",
+                    text(v, "name")?,
+                    text(v, "version_type")?,
+                    if compatible(v, context, kind).is_ok() {
+                        ""
+                    } else {
+                        " · 不匹配当前实例"
+                    }
+                ),
             })
         })
         .collect()
@@ -458,6 +528,41 @@ fn id_check(s: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn browsing_overrides_keep_target_side_and_do_not_relax_installation() {
+        let context = Context {
+            game: "26.3".into(),
+            loader: "fabric".into(),
+            server: true,
+        };
+        let full = browse_filters(&context, "mod", Browse::default()).unwrap();
+        assert!(full.iter().flatten().any(|f| f == "versions:26.3"));
+        let broad = browse_filters(
+            &context,
+            "mod",
+            Browse {
+                game: false,
+                loader: false,
+            },
+        )
+        .unwrap();
+        assert!(
+            !broad
+                .iter()
+                .flatten()
+                .any(|f| f.starts_with("versions:") || f.starts_with("categories:"))
+        );
+        assert!(broad.iter().flatten().any(|f| f == "server_side:required"));
+        assert!(broad.iter().flatten().any(|f| f == "project_type:mod"));
+        assert!(
+            compatible(
+                &json!({"game_versions":["1.12.2"],"loaders":["forge"]}),
+                &context,
+                "mod"
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn plugins_require_server_loader_and_keep_a_separate_destination() {
         let mut context = Context {

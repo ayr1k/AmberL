@@ -66,6 +66,8 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     if view.content_revision != model.content.revision {
         let c = &model.content;
         ui.set_content_server(c.context.as_ref().is_some_and(|c| c.server));
+        ui.set_content_match_game(c.browse.game);
+        ui.set_content_match_loader(c.browse.loader);
         ui.set_content_kind_index(
             ["mod", "resourcepack", "shader", "plugin"]
                 .iter()
@@ -377,7 +379,14 @@ fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
         let kind = *["mod", "resourcepack", "shader", "plugin"]
             .get(usize::try_from(u.get_content_kind_index()).map_err(|_| "请选择内容类型")?)
             .ok_or("请选择内容类型")?;
-        m.search_content(kind.into(), u.get_content_query().to_string())
+        m.search_content(
+            kind.into(),
+            u.get_content_query().to_string(),
+            ambrum::content::modrinth::Browse {
+                game: u.get_content_match_game(),
+                loader: u.get_content_match_loader(),
+            },
+        )
     });
     action!(on_content_project, |u: &Launcher, m: &mut Model| m
         .content_versions(u.get_content_project_index()));

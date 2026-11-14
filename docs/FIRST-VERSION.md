@@ -8,7 +8,7 @@ is not user acceptance or authorization to merge/publish. Baseline: `452c161`.
 |---|---|---|
 | Accounts and launch | Microsoft/DPAPI, explicit Java, Vanilla and four client loaders run | Broader supported matrix, old Java/game, error/recovery acceptance |
 | Multiplayer | Vanilla, Fabric, Quilt, Forge, NeoForge and Paper lifecycle; verified snapshots restored into new runnable worlds; bounded configuration with recovery; invitation; one-PC authenticated entry; FRP forwarding/node-restart reconnection and independent stop | Public-node and two physical devices/NAT acceptance |
-| Content | Modrinth search, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices, filter overrides and broader GUI acceptance |
+| Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices and broader GUI acceptance |
 | Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection; Java 8 old server and Java 25 Forge worlds | Additional runtime variants and game/UI acceptance |
 | Libraries and data | Multi-library read-only registration, new isolated installs | Owned-instance maintenance, shared/unknown capability rules, backups/restore/recoverable removal |
 | Desktop | Frameless glass, version list, saved per-game choices | Final framework comparison decision, Chinese/English, light/dark, keyboard/IME/Narrator/DPI |

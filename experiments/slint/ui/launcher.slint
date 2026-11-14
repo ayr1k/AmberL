@@ -141,6 +141,8 @@ export component Launcher inherits Window {
     in-out property <string> server-mode: "survival";
     in property <string> content-target; in property <string> content-preview;
     in property <bool> content-server;
+    in-out property <bool> content-match-game: true;
+    in-out property <bool> content-match-loader: true;
     in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
     in property <[string]> content-group-states;
     in property <[OptionalRow]> content-optional;
@@ -526,7 +528,12 @@ export component Launcher inherits Window {
                             LineEdit { text <=> root.content-query; placeholder-text: "搜索 Modrinth"; accessible-label: "搜索内容"; enabled: !root.busy; }
                             Action { width: 80px; label: "搜索"; enabled: !root.busy; clicked => { root.search-content(); } }
                         }
-                        ScrollView { height: min(168px,root.height - 580px);
+                        HorizontalLayout { height: 28px; spacing: 16px;
+                            CheckBox { text: "匹配游戏版本"; checked <=> root.content-match-game; enabled: !root.busy; toggled => { root.search-content(); } }
+                            CheckBox { text: "匹配加载器"; checked <=> root.content-match-loader; enabled: !root.busy; toggled => { root.search-content(); } }
+                            Text { text: "安装前仍会核对兼容性"; color: #becacb; font-size: 13px; vertical-alignment: center; }
+                        }
+                        ScrollView { height: min(168px,root.height - 618px);
                             VerticalLayout { spacing: 6px;
                                 for project[index] in root.content-projects: Action { height: 38px; label: project; selected: root.content-project-index == index; enabled: !root.busy; clicked => { root.content-project-index=index; root.content-project(); } }
                             }
