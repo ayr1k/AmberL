@@ -472,3 +472,144 @@ fn recovery_rejects_junctions_without_touching_the_external_target() {
     assert_eq!(fs::read(moved.join("test/test.jar")).unwrap(), b"abc");
     assert!(!f.parent.join("new-game").exists());
 }
+
+#[test]
+fn imported_user_data_is_mutable_and_original_launcher_state_is_excluded() {
+    for kind in ["official", "pcl", "hmcl"] {
+        let f = Fixture::new();
+        let library = f.root.join("external");
+        let game = library.join("versions/test");
+        fs::create_dir_all(game.join("saves/中文世界")).unwrap();
+        let mut meta = f.metadata.clone();
+        match kind {
+            "official" => meta["gameDir"] = json!("versions/test"),
+            "pcl" => {
+                fs::create_dir(game.join("PCL")).unwrap();
+                fs::write(game.join("PCL/Setup.ini"), "VersionArgumentIndieV2:True").unwrap();
+            }
+            _ => fs::write(
+                game.join("hmclversion.cfg"),
+                br#"{"usesGlobal":false,"gameDirType":1}"#,
+            )
+            .unwrap(),
+        }
+        fs::write(game.join("test.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+        fs::write(game.join("saves/中文世界/level.dat"), b"original-world").unwrap();
+        fs::write(game.join("options.txt"), b"lang:zh_cn").unwrap();
+        fs::write(
+            game.join("accounts.json"),
+            b"excluded-fixture-not-a-credential",
+        )
+        .unwrap();
+        let mut registry = crate::registry::Registry::open(&f.app).unwrap();
+        let id = registry.attach(&library).unwrap().id;
+        let cancel = Cancellation::default();
+        let scan = registry.scan(&id, &cancel).unwrap();
+        let selected = crate::import::Selection::capture(&scan.instances[0]).unwrap();
+        drop(registry);
+        let mut source = crate::import::Source::open(&f.app, &selected, false, &cancel).unwrap();
+        assert_eq!(source.file_count(), 2);
+        assert!(source.check_parent(&library).is_err());
+        let cache = Cache::open(&f.app).unwrap();
+        let installed = vanilla_with_data(
+            &cache,
+            &f.metadata,
+            &Platform::windows_x64("10.0.26100"),
+            &f.parent,
+            "imported",
+            1024 * 1024,
+            Some(&mut source),
+            &cancel,
+            |_| {},
+        )
+        .unwrap();
+        drop(source);
+        let copy = installed.game_directory;
+        assert_eq!(
+            fs::read(copy.join("saves/中文世界/level.dat")).unwrap(),
+            b"original-world"
+        );
+        assert!(!copy.join("accounts.json").exists());
+        assert!(!copy.join("PCL").exists());
+        assert!(!copy.join("hmclversion.cfg").exists());
+        fs::write(copy.join("saves/中文世界/level.dat"), b"changed-in-copy").unwrap();
+        drop(crate::transaction::Installed::open(&copy, &cancel).unwrap());
+        assert_eq!(
+            fs::read(game.join("saves/中文世界/level.dat")).unwrap(),
+            b"original-world"
+        );
+        assert!(!library.join("installation.pending.json").exists());
+        let mut source = crate::import::Source::open(&f.app, &selected, false, &cancel).unwrap();
+        assert!(
+            vanilla_with_data(
+                &cache,
+                &f.metadata,
+                &Platform::windows_x64("10.0.26100"),
+                &f.parent,
+                "imported",
+                1024 * 1024,
+                Some(&mut source),
+                &cancel,
+                |_| {}
+            )
+            .is_err()
+        );
+        let stopped = Cancellation::default();
+        let token = stopped.clone();
+        assert!(
+            vanilla_with_data(
+                &cache,
+                &f.metadata,
+                &Platform::windows_x64("10.0.26100"),
+                &f.parent,
+                "cancelled-import",
+                1024 * 1024,
+                Some(&mut source),
+                &stopped,
+                |p| {
+                    if p.files_written > 0 {
+                        token.cancel();
+                    }
+                }
+            )
+            .is_err()
+        );
+        assert!(!f.parent.join("cancelled-import").exists());
+    }
+}
+
+#[test]
+fn import_requires_current_known_directory_and_rejects_aliases() {
+    let f = Fixture::new();
+    let library = f.root.join("external");
+    let game = library.join("versions/test");
+    fs::create_dir_all(&game).unwrap();
+    let path = game.join("test.json");
+    let mut meta = f.metadata.clone();
+    fs::write(&path, serde_json::to_vec(&meta).unwrap()).unwrap();
+    let mut registry = crate::registry::Registry::open(&f.app).unwrap();
+    let id = registry.attach(&library).unwrap().id;
+    let c = Cancellation::default();
+    assert!(
+        crate::import::Selection::capture(&registry.scan(&id, &c).unwrap().instances[0]).is_none()
+    );
+    meta["gameDir"] = json!(".");
+    fs::write(&path, serde_json::to_vec(&meta).unwrap()).unwrap();
+    let selected =
+        crate::import::Selection::capture(&registry.scan(&id, &c).unwrap().instances[0]).unwrap();
+    drop(registry);
+    assert!(crate::import::Source::open(&f.app, &selected, false, &c).is_err());
+    drop(crate::import::Source::open(&f.app, &selected, true, &c).unwrap());
+    meta["gameDir"] = json!("versions/test");
+    fs::write(&path, serde_json::to_vec(&meta).unwrap()).unwrap();
+    assert!(crate::import::Source::open(&f.app, &selected, true, &c).is_err());
+    let registry = crate::registry::Registry::open(&f.app).unwrap();
+    let selected =
+        crate::import::Selection::capture(&registry.scan(&id, &c).unwrap().instances[0]).unwrap();
+    drop(registry);
+    let outside = f.root.join("unchanged.txt");
+    fs::write(&outside, b"keep").unwrap();
+    fs::hard_link(&outside, game.join("options.txt")).unwrap();
+    assert!(crate::import::Source::open(&f.app, &selected, false, &c).is_err());
+    assert_eq!(fs::read(outside).unwrap(), b"keep");
+}

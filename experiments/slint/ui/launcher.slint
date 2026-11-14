@@ -100,6 +100,13 @@ export component Launcher inherits Window {
     in property <bool> busy;
     in property <bool> running;
     in property <bool> launch-candidate;
+    in property <bool> import-candidate;
+    in property <bool> import-shared;
+    in property <string> library-details;
+    in-out property <string> import-parent;
+    in-out property <string> import-name;
+    in-out property <bool> import-acknowledged: false;
+    callback import-game();
     in property <[string]> account-options;
     in property <string> account-label: @tr("登录微软账户");
     in-out property <int> account-index: 0;
@@ -263,7 +270,7 @@ export component Launcher inherits Window {
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: Theme.dialog;
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
-                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? @tr("微软账户") : root.panel == 2 ? @tr("启动配置") : root.panel == 3 ? @tr("添加游戏库") : root.panel == 4 ? @tr("安装游戏") : root.panel == 5 ? @tr("当前任务") : root.panel == 6 ? @tr("联机") : root.panel == 8 ? @tr("内容管理") : root.panel == 9 ? @tr("实例与备份") : root.panel == 10 ? @tr("设置") : @tr("关于 AmberL"); color: Theme.text; font-size: 28px; font-weight: 600; }
+                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? @tr("微软账户") : root.panel == 2 ? @tr("启动配置") : root.panel == 3 ? @tr("添加游戏库") : root.panel == 4 ? @tr("安装游戏") : root.panel == 5 ? @tr("当前任务") : root.panel == 6 ? @tr("联机") : root.panel == 8 ? @tr("内容管理") : root.panel == 9 ? @tr("实例与备份") : root.panel == 10 ? @tr("设置") : root.panel == 11 ? @tr("游戏库详情与副本") : @tr("关于 AmberL"); color: Theme.text; font-size: 28px; font-weight: 600; }
                     Action { width: Locale.english ? 150px : 100px; label: root.panel == 8 && root.content-server ? @tr("返回联机") : @tr("返回游戏"); clicked => { root.panel=root.panel == 8 && root.content-server ? 6 : 0; } }
                 }
                 if root.panel == 1: VerticalLayout {
@@ -300,7 +307,21 @@ export component Launcher inherits Window {
                         Button { text: @tr("保存启动配置"); enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
                     }
                     Text { vertical-stretch: 0; text: @tr("只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"); color: Theme.secondary; wrap: word-wrap; }
-                    Action { height: 40px; label: @tr("实例与备份"); enabled: !root.busy; clicked => { root.open-maintenance(); } }
+                    Action { height: 40px; label: root.selected-id != "" && !root.launch-candidate ? @tr("游戏库详情与副本") : @tr("实例与备份"); enabled: !root.busy; clicked => { if root.selected-id != "" && !root.launch-candidate { root.import-acknowledged=false; root.panel=11; } else { root.open-maintenance(); } } }
+                }
+                if root.panel == 11: ScrollView { content-width: self.width;
+                  VerticalLayout { spacing: 10px;
+                    Text { text: root.game-title + " · " + root.game-subtitle; color: Theme.text; font-size: 14px; overflow: elide; }
+                    TextEdit { height: 90px; font-size: 13px; text: root.library-details; read-only: true; accessible-label: @tr("来源路径与隔离证据"); }
+                    Text { text: root.import-candidate ? @tr("可创建独立原版副本。原库只读，不直接启动或修改；隔离未知、冲突或模组加载器暂不支持导入。") : @tr("仅可查看。隔离位置未知、冲突或模组加载器不支持导入，请先在原启动器核对配置并重新扫描。"); color: Theme.secondary; font-size: 12px; wrap: word-wrap; }
+                    Text { text: @tr("复制存档、资源包、截图和设置文件；官方游戏资源重新校验下载。不会复制账户、启动器配置或模组。总计最多 16 GiB，请先关闭来源游戏。"); color: Theme.secondary; font-size: 12px; wrap: word-wrap; }
+                    Text { text: @tr("副本父目录 · 与原库分离的已有文件夹"); color: Theme.text; font-size: 13px; }
+                    LineEdit { height: 36px; text <=> root.import-parent; enabled: root.import-candidate && !root.busy; accessible-label: @tr("副本父目录"); }
+                    Text { text: @tr("副本名称（同时作为新文件夹名）"); color: Theme.text; font-size: 13px; }
+                    LineEdit { height: 36px; text <=> root.import-name; enabled: root.import-candidate && !root.busy; accessible-label: @tr("副本文件夹名称"); }
+                    if root.import-shared: CheckBox { text: @tr("确认复制共享目录的全部存档与设置"); checked <=> root.import-acknowledged; enabled: !root.busy; }
+                    Action { height: 44px; label: @tr("创建独立副本"); selected: true; enabled: root.import-candidate && !root.busy && root.import-parent != "" && root.import-name != "" && (!root.import-shared || root.import-acknowledged); clicked => { root.import-game(); } }
+                  }
                 }
                 if root.panel == 3: VerticalLayout {
                     spacing: 18px;
@@ -652,7 +673,7 @@ export component Launcher inherits Window {
                     Text { text: @tr("外观会保存在 AmberL 中，下次打开自动恢复。账户和每个游戏的启动配置独立保存。"); color: Theme.secondary; wrap: word-wrap; }
                     Action { height: 44px; label: @tr("打开当前游戏配置"); clicked => { root.panel=2; } }
                 }
-                Rectangle { vertical-stretch: 1; }
+                if root.panel != 11: Rectangle { vertical-stretch: 1; }
                 HorizontalLayout { height: 44px; spacing: 12px;
                     Text { text: root.panel == 6 && !root.busy ? root.network-status : root.status; color: Theme.secondary; wrap: word-wrap; overflow: elide; vertical-alignment: center; }
                     if root.busy: Action { width: Locale.english ? 220px : 176px; height: 44px; label: root.running ? @tr("请求游戏正常退出") : @tr("取消当前操作"); clicked => { root.cancel(); } }

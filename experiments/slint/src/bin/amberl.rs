@@ -391,6 +391,11 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         .into(),
     );
     ui.set_launch_candidate(selected.is_some_and(|g| g.installation_hint));
+    ui.set_import_candidate(selected.is_some_and(|g| g.copy_candidate));
+    ui.set_import_shared(
+        selected.is_some_and(|g| g.isolation == ambrum::library::Isolation::Shared),
+    );
+    ui.set_library_details(selected.map_or("", |g| g.details.as_str()).into());
     ui.set_busy(model.busy());
     ui.set_running(model.running);
     ui.set_status(tr(&model.status));
@@ -862,6 +867,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     let os = windows_version();
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        let os = os.clone();
+        ui.on_import_game(move || {
+            if let Some(ui) = weak.upgrade() {
+                operation(&model, |m| {
+                    m.import_game(
+                        PathBuf::from(ui.get_import_parent().as_str()),
+                        ui.get_import_name().to_string(),
+                        ui.get_import_acknowledged(),
+                        os.clone(),
+                    )
+                });
+            }
+        });
+    }
     network_callbacks(&ui, &model);
     {
         let model = model.clone();

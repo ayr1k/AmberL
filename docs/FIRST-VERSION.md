@@ -10,7 +10,7 @@ is not user acceptance or authorization to merge/publish. Baseline: `452c161`.
 | Multiplayer | Vanilla, Fabric, Quilt, Forge, NeoForge and Paper lifecycle; verified snapshots restored into new runnable worlds; bounded configuration with recovery; invitation; one-PC authenticated entry; FRP forwarding/node-restart reconnection and independent stop | Public-node and two physical devices/NAT acceptance |
 | Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices and broader GUI acceptance |
 | Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection; Java 8 old server and Java 25 Forge worlds | Additional runtime variants and game/UI acceptance |
-| Libraries and data | Multi-library read-only registration, new isolated installs; owned-instance naming/icons, full snapshots/new-copy restore and recoverable removal | Shared/unknown capability rules and broader imported-library support |
+| Libraries and data | Multi-library read-only registration; known Vanilla data copied into a new verified installation; shared confirmation/unknown blocking; naming/icons, snapshots/new-copy restore and recoverable removal | Broader imported-library/modded/alias support and user-library acceptance |
 | Desktop | Frameless glass, version list, saved per-game choices, persistent light/dark appearance and Chinese/English UI | Final framework comparison decision, broader diagnostic localization, full keyboard/IME/Narrator/DPI acceptance |
 | Delivery | Exact-source ZIP, checksums/notices, Draft PR and CI; per-user installer with actual install/upgrade/launch/uninstall/data-retention verification | Update channel, clean-machine startup, release documentation |
 | Product acceptance | Disposable local fixtures and user feedback | Same-condition AMBER comparison, two-device and user task acceptance |
@@ -69,3 +69,8 @@ Development evidence (each package/PR pins its tested revision):
   Theme-only configuration upgrade, independent preference saves and corrupt-file
   preservation passed. Raw logs/provider errors and some diagnostics retain their
   original language; broader localization/accessibility acceptance remains open.
+- External Vanilla data can now be copied into a new verified official installation.
+  Actual native import of a disposable HMCL-style world, world entry/save/exit 0,
+  unchanged source hashes, shared confirmation and unknown-isolation blocking passed.
+  The final form was inspected at 1002 × 702; 126 workspace tests pass. See IMPORT.md
+  for copied data, recovery and the remaining modded/alias compatibility limits.

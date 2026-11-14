@@ -37,6 +37,8 @@ process, service or per-frame CPU convolution is used. System fonts are not bund
 `amberl.exe --app-directory <已有独立目录>`；不要把游戏目录作为应用数据目录。
 账户与 Java 不会自动替换为第一项。后台任务期间不允许切换启动目标。
 外部游戏库只登记和扫描，不迁移、不修改、不直接启动。
+已确认隔离位置的原版实例可通过 **配置 → 游戏库详情与副本** 创建独立副本；
+共享目录需要勾选确认，原库仍保持只读。详见 [副本导入与限制](IMPORT.md)。
 
 ## Limits / 限制
 

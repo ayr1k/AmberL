@@ -131,6 +131,25 @@ pub fn vanilla(
     new_name: &str,
     max_bytes: u64,
     cancel: &Cancellation,
+    progress: impl FnMut(Progress),
+) -> Result<Installed> {
+    vanilla_with_data(
+        cache, metadata, platform, parent, new_name, max_bytes, None, cancel, progress,
+    )
+}
+
+/// Copy known user data only into the same staged new installation transaction.
+/// Source handles remain pinned; no source files or launcher credentials are written.
+#[allow(clippy::too_many_arguments)]
+pub fn vanilla_with_data(
+    cache: &Cache,
+    metadata: &Value,
+    platform: &Platform,
+    parent: &Path,
+    new_name: &str,
+    max_bytes: u64,
+    mut source: Option<&mut crate::import::Source>,
+    cancel: &Cancellation,
     mut progress: impl FnMut(Progress),
 ) -> Result<Installed> {
     cancel.check()?;
@@ -138,6 +157,14 @@ pub fn vanilla(
         return Err("Explicit positive installation byte budget required".into());
     }
     let version = VersionPlan::parse(metadata, platform)?;
+    if let Some(source) = &source {
+        source.check_parent(parent)?;
+        if source.version != version.version
+            || metadata["mainClass"] != "net.minecraft.client.main.Main"
+        {
+            return Err("副本游戏版本或加载器与来源不符".into());
+        }
+    }
     let index = &version
         .files
         .iter()
@@ -167,6 +194,11 @@ pub fn vanilla(
         ("installation.ready.json".into(), false),
     );
     let mut copies = Vec::new();
+    if let Some(source) = &source {
+        for (path, _, bytes) in &source.files {
+            layout.reserve(path, *bytes)?;
+        }
+    }
     for file in version.files.iter().chain(&assets.files) {
         layout.reserve(&file.path, file.artifact.size)?;
         copies.push(Copy {
@@ -296,6 +328,15 @@ pub fn vanilla(
                 .by_index(index)
                 .map_err(|_| "Cannot reopen verified native entry")?;
             stage.write(&path, &mut entry, size, cancel)?;
+            written += 1;
+            emit(Phase::Staging, written, &mut progress);
+        }
+    }
+    if let Some(source) = source.as_mut() {
+        for (path, file, size) in &mut source.files {
+            use std::io::{Seek, SeekFrom};
+            file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+            stage.write_mutable(path, file, *size, cancel)?;
             written += 1;
             emit(Phase::Staging, written, &mut progress);
         }

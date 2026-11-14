@@ -21,6 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 pub mod content;
+pub mod import;
 pub mod maintenance;
 pub mod network;
 
@@ -33,6 +34,10 @@ pub struct Game {
     pub title: String,
     pub icon: String,
     pub subtitle: String,
+    pub copy_source: Option<ambrum::import::Selection>,
+    pub isolation: Isolation,
+    pub details: String,
+    pub copy_candidate: bool,
     /// A display hint only. launch::run rechecks receipts, identity and all resources.
     pub installation_hint: bool,
 }
@@ -83,6 +88,7 @@ enum Message {
     Finished(Result<()>),
 }
 enum Operation {
+    Import(import::Request),
     Maintenance(maintenance::Request),
     Content(content::Request),
     Reload,
@@ -518,6 +524,10 @@ fn reload(
                         Isolation::Unknown => "隔离待确认",
                         Isolation::Conflict => "隔离冲突",
                     };
+                    let copy_source = (!hint
+                        && scan.library.kind == ambrum::library::LibraryKind::Minecraft)
+                        .then(|| ambrum::import::Selection::capture(&instance))
+                        .flatten();
                     games.push(Game {
                         id: serde_json::to_string(&instance.id).map_err(|_| "无效条目身份")?,
                         library_id: entry.id.clone(),
@@ -525,6 +535,19 @@ fn reload(
                         version: instance.name.clone(),
                         title,
                         icon,
+                        copy_candidate: copy_source.is_some(),
+                        copy_source,
+                        isolation: instance.isolation,
+                        details: format!(
+                            "{}\n{}\n{}\n{}",
+                            entry.path.display(),
+                            instance.game_dir.as_ref().map_or_else(
+                                || "游戏数据位置未确认".into(),
+                                |p| p.display().to_string()
+                            ),
+                            instance.evidence.join(" · "),
+                            instance.issue.as_deref().unwrap_or("")
+                        ),
                         subtitle: format!(
                             "{} · {} · {}",
                             instance.game,
@@ -562,6 +585,7 @@ fn execute(
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
     match operation {
+        Operation::Import(request) => import::execute(app, request, cancel, sender),
         Operation::Maintenance(request) => maintenance::execute(app, request, cancel, sender),
         Operation::Reload => reload(app, cancel, sender),
         Operation::Catalog => send(
@@ -768,6 +792,10 @@ mod tests {
             title: "原版生存".into(),
             icon: "grass".into(),
             subtitle: String::new(),
+            copy_source: None,
+            isolation: Isolation::Isolated,
+            details: String::new(),
+            copy_candidate: false,
             installation_hint: true,
         }
     }

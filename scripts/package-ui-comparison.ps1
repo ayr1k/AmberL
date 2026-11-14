@@ -14,6 +14,7 @@ Get-ChildItem local/ui-build/winui | Where-Object { $_.Name -notmatch '\.(pdb|li
 Copy-Item assets/instance-icons/LICENSE-lucide.txt -Destination (Join-Path $package 'licenses')
 Copy-Item docs/FRP.md -Destination $package
 Copy-Item docs/INSTANCE-RECOVERY.md -Destination $package
+Copy-Item docs/IMPORT.md -Destination $package
 Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,docs/MULTIPLAYER.md,docs/CONTENT.md,docs/FIRST-VERSION.md,docs/INSTALLER.md,design-qa.md -Destination $package
 Copy-Item scripts/make-fixture.ps1 -Destination (Join-Path $package 'scripts')
 git -c core.autocrlf=false archive --format=zip "--output=$package/AmberL-source.zip" HEAD

@@ -669,3 +669,36 @@ msgstr "Java executable (java.exe)"
 
 msgid "JAVA 运行环境"
 msgstr "JAVA RUNTIME"
+
+msgid "游戏库详情与副本"
+msgstr "Library and copy"
+
+msgid "来源路径与隔离证据"
+msgstr "Source paths and isolation evidence"
+
+msgid "可创建独立原版副本。原库只读，不直接启动或修改；隔离未知、冲突或模组加载器暂不支持导入。"
+msgstr "An independent Vanilla copy is available. The source stays read-only. Unknown/conflicting isolation and modded loaders cannot be imported yet."
+
+msgid "仅可查看。隔离位置未知、冲突或模组加载器不支持导入，请先在原启动器核对配置并重新扫描。"
+msgstr "Inspection only. Unknown/conflicting isolation and modded loaders cannot be imported. Check the original launcher's settings, then rescan."
+
+msgid "复制存档、资源包、截图和设置文件；官方游戏资源重新校验下载。不会复制账户、启动器配置或模组。总计最多 16 GiB，请先关闭来源游戏。"
+msgstr "Copies saves, resource packs, screenshots and settings; verifies/downloads official game files. Excludes accounts, launcher settings and mods. Limit: 16 GiB. Close the source game first."
+
+msgid "副本父目录 · 与原库分离的已有文件夹"
+msgstr "Copy parent · an existing folder separate from the source"
+
+msgid "副本父目录"
+msgstr "Copy parent folder"
+
+msgid "副本文件夹名称"
+msgstr "Copy folder name"
+
+msgid "确认复制共享目录的全部存档与设置"
+msgstr "Copy all saves and settings from the shared directory"
+
+msgid "创建独立副本"
+msgstr "Create independent copy"
+
+msgid "副本名称（同时作为新文件夹名）"
+msgstr "Copy name (also used for the new folder)"

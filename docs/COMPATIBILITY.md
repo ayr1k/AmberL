@@ -1,5 +1,24 @@
 # Compatibility: explicit capabilities
 
+## Current copy/ownership matrix
+
+| Input/state | Inspect | Direct launch / modify source | Independent copy | Operations on the owned copy |
+|---|---|---|---|---|
+| Official/PCL/HMCL Vanilla, confirmed isolated directory | Yes | No | Known game-data files + verified official resources | Launch, content, naming/icons, removal, backup/restore |
+| Same profiles, confirmed shared directory | Yes | No | Explicit shared-data acknowledgement required | Same; copied data is now independent |
+| Unknown or conflicting directory evidence | Limited, with reason | No | Blocked | Not applicable |
+| Modded/unknown loaders, custom aliases/patches | Inspect supported metadata | No | Not supported in this slice | Not applicable |
+| AMBER-managed layout | Basic inspection | No | Not supported | Not applicable |
+| Complete AmberL installation | Yes | Receipt/identity/hash/Java/account verification before launch | Full verified snapshot restoration | Supported within documented limits |
+
+See [IMPORT.md](IMPORT.md) for the precise copied-file list, limits and synthetic
+official/PCL/HMCL plus actual disposable-world evidence. No arbitrary external source
+is adopted for writes. A copy does not establish modded-world compatibility.
+
+以下保留早期只读样机的识别边界；当前副本导入能力以上表与 IMPORT.md 为准。
+
+## Historical probe inspection matrix
+
 These are the **initial probe's** capabilities, not the stable product contract.
 External-library launch/update/restore remain unsupported. Separately, AmberL-created
 Vanilla installations now support authenticated Windows x64 CLI launch; see AUTH-LAUNCH.md.
@@ -63,7 +82,7 @@ results do not establish AmberL compatibility. Modern Forge/NeoForge module laun
 and old Java native-window behavior are explicit future test cases.
 
 
-## Current authenticated-launch cell
+## Historical initial authenticated-launch cell
 
 Vanilla 26.3 + explicit x64 Microsoft OpenJDK 25.0.4: actual Microsoft authorization,
 DPAPI reopen, fresh entitlement/profile, visible menu, new world and normal save/exit

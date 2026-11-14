@@ -10,6 +10,8 @@ pub mod content;
 #[cfg(windows)]
 pub mod download;
 #[cfg(windows)]
+pub mod import;
+#[cfg(windows)]
 pub mod install;
 pub mod java;
 #[cfg(windows)]
