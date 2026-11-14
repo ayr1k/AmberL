@@ -34,7 +34,7 @@ impl Glass {
             return Image::default();
         }
         // Blurred imagery needs little resolution; bound memory even on very large monitors.
-        let scale = 0.5_f32.min(2048.0 / vw).min(1080.0 / vh);
+        let scale = 2.0_f32.min(3840.0 / vw).min(2160.0 / vh);
         let size = ((vw * scale).ceil() as u32, (vh * scale).ceil() as u32);
         if size != self.size {
             self.viewport = imageops::resize(

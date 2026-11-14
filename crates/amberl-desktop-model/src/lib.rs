@@ -167,7 +167,7 @@ impl Model {
             catalog_revision: 0,
             selected,
             preferences,
-            status: saved.err().unwrap_or_else(|| "选择或安装一个游戏".into()),
+            status: saved.err().unwrap_or_default(),
             device_prompt: String::new(),
             revision: 1,
             data_revision: 1,
@@ -216,10 +216,12 @@ impl Model {
     pub fn report(&mut self, message: String) {
         let message = message.chars().take(2048).collect::<String>();
         self.status = message.clone();
-        if self.log.len() == 120 {
+        if !message.is_empty() && self.log.len() == 120 {
             self.log.pop_front();
         }
-        self.log.push_back(message);
+        if !message.is_empty() {
+            self.log.push_back(message);
+        }
         self.revision += 1;
     }
     pub fn reload(&mut self) -> Result<()> {
@@ -444,7 +446,7 @@ impl Model {
                 }
                 Message::Finished(result) => {
                     self.report(match result {
-                        Ok(()) => "操作完成".into(),
+                        Ok(()) => String::new(),
                         Err(error) => error,
                     });
                     finished = true;

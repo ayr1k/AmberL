@@ -1,5 +1,41 @@
 # Native launcher preview / 原生启动器预览
 
+## Window and workspace polish — 2026-11-14
+
+Games and Multiplayer now share the primary navigation. Multiplayer fills the
+workspace, with a left sidebar and a scrollable form rather than a centered dialog.
+Forms have a maximum readable width on large screens; the minimum window is
+960 × 640 logical pixels. Drag the logo or unused top-bar area to move the window;
+resize at its edges or the visible bottom-right grip. Window operations use the
+native winit/Windows move and resize paths.
+
+The launcher enables FemtoVG GPU rendering, retaining the software fallback.
+Glass corner masks are sampled at up to twice logical resolution (bounded to
+3840 × 2160); the blur applies to the scenery, not text or controls. The original
+comparison executable explicitly retains its software renderer, so its earlier
+measurements are not presented as measurements of the new launcher renderer.
+
+Page entry fades take 180 ms and button color transitions take 130 ms. Windows'
+client-area animation preference is read at startup and respected. Successful
+background refreshes no longer write generic completion messages; active progress,
+errors and explicit server/room/FRP state remain visible. Existing task logs remain.
+
+联机使用独立主界面和左侧导航；小窗口内容可滚动，大屏表单不再无限拉宽。
+顶部标志与空白区域可拖动，边缘和右下角角标可调整尺寸。短过渡遵循 Windows
+动画设置。移除空闲时的通用“操作完成”，保留真实任务进度、错误及联机状态。
+
+GPU availability and fallback quality still depend on the machine/driver. The
+existing background artwork remains 1487 × 1058; it is not a newly generated 4K
+asset. Cross-monitor DPI/Narrator acceptance remains separate from this UI fix.
+
+Verification: the native launcher was inspected in Chinese and English at about
+962 × 641, normal 1280 × 820 and maximized 2560 × 1440 on the current Windows
+desktop. Dragging the maximized top bar restored and moved the window; the visible
+corner grip resized it to the minimum. Settings, server creation and FRP controls
+remained readable, and idle generic completion text was absent. The desktop-model
+tests (7), strict workspace/Slint Clippy and release UI build passed. These checks
+use an isolated app directory, not the installed preview's data.
+
 Open **`launcher/amberl.exe`** in the UI development ZIP. The `slint/` and `winui/`
 executables are the older framework comparison samples, not this interface.
 Windows x64, tested on Windows 11; unpack-and-run preview, not a stable installer.
@@ -9,7 +45,7 @@ and then requested a full-window background with Aero-like frosted menus. The
 implemented view has a 64 px navigation panel, compact game list and aligned 56 px
 launch controls. Teal identifies the logo center, terminal L and primary action.
 The native Windows caption is removed. Integrated minimize/maximize/close controls,
-OS-backed dragging and a 6 px resize border share the existing safe-close handler.
+OS-backed dragging and a 10 px resize border share the existing safe-close handler.
 
 Glass uses one Gaussian-blurred copy of the embedded static scene, calculated once
 at startup and reused with viewport-aligned offsets and clipped rounded panels.

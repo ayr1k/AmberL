@@ -794,6 +794,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let ui = Launcher::new()?;
     {
+        use slint::winit_030::{WinitWindowAccessor, winit};
+        let weak = ui.as_weak();
+        let move_weak = ui.as_weak();
+        ui.on_move_window(move || {
+            if let Some(ui) = move_weak.upgrade() {
+                ui.window().with_winit_window(|window| {
+                    let _ = window.drag_window();
+                });
+            }
+        });
+        ui.on_resize_window(move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.window().with_winit_window(|window| {
+                    let _ = window.drag_resize_window(winit::window::ResizeDirection::SouthEast);
+                });
+            }
+        });
+    }
+    {
         let weak = ui.as_weak();
         ui.on_minimize(move || {
             if let Some(ui) = weak.upgrade() {
@@ -809,6 +828,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+    // Respect Windows' animation preference without changing system settings.
+    let mut animations: i32 = 1;
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
+            windows_sys::Win32::UI::WindowsAndMessaging::SPI_GETCLIENTAREAANIMATION,
+            0,
+            (&mut animations as *mut i32).cast(),
+            0,
+        );
+    }
+    ui.global::<Theme>().set_motion(animations != 0);
     let glass = RefCell::new(glass::Glass::new()?);
     ui.global::<GlassAssets>()
         .on_tile(move |x, y, w, h, vw, vh| glass.borrow_mut().tile([x, y, w, h, vw, vh]));

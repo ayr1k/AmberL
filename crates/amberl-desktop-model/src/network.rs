@@ -82,7 +82,7 @@ impl Network {
             app,
             servers: vec![],
             selected: None,
-            status: "创建服务端，或使用邀请加入房间".into(),
+            status: String::new(),
             server_status: "未启动".into(),
             room_status: "未加入房间".into(),
             query_status: "尚未查询".into(),
@@ -537,7 +537,7 @@ impl Network {
                     0 => {
                         self.component = room::installed(&self.app);
                         self.frp_component = frp::installed(&self.app);
-                        self.status = error.unwrap_or_else(|| "联机配置已完成".into());
+                        self.status = error.unwrap_or_default();
                     }
                     1 => {
                         self.commands = None;

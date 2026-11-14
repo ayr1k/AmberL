@@ -10,6 +10,7 @@ export global Locale {
 }
 export global Theme {
     in-out property <bool> light: false;
+    in-out property <bool> motion: true;
     out property <color> text: light ? #183d35 : #f2f6f3;
     out property <color> secondary: light ? #3d5d56 : #becacb;
     out property <color> accent: light ? #12614d : #9ae3cc;
@@ -38,12 +39,14 @@ component Action inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked();
     height: 44px; min-width: 64px; border-radius: 9px;
+    animate background { duration: Theme.motion ? 130ms : 0ms; easing: ease-out; }
+    animate border-color { duration: Theme.motion ? 130ms : 0ms; easing: ease-out; }
     background: primary ? (!enabled ? #4c897c80 : touch.has-hover ? #86e5c9 : #62d6b4) : selected ? Theme.selection : touch.has-hover ? Theme.hover : flat ? transparent : Theme.control;
     border-width: focus.has-focus ? 2px : primary || flat ? 0px : 1px;
     border-color: focus.has-focus ? (on-scene ? #c1f5e8 : Theme.focus) : selected ? Theme.focus : Theme.border;
     accessible-role: button; accessible-label: hint + " " + label; accessible-enabled: enabled;
     accessible-action-default => { if enabled { root.clicked(); } }
-    if hint != "": Text { vertical-stretch: 0; x: 16px; y: 8px; width: parent.width - 32px; height: 16px; text: root.hint; color: Theme.secondary; font-size: 11px; overflow: elide; }
+    if hint != "": Text { vertical-stretch: 0; x: 16px; y: 8px; width: parent.width - 32px; height: 16px; text: root.hint; color: Theme.secondary; font-size: 12px; overflow: elide; }
     Text { vertical-stretch: 0; x: root.hint == "" ? 8px : 16px; y: root.hint == "" ? 0px : 26px; width: parent.width - (root.hint == "" ? 16px : 32px); height: root.hint == "" ? parent.height : 22px;
         text: root.label; color: !root.enabled ? Theme.disabled : root.primary ? #102d27 : root.on-scene ? #f2f6f3 : Theme.text; font-size: root.primary ? 20px : 14px;
         font-weight: root.primary || root.selected ? 600 : 400; horizontal-alignment: root.hint == "" && !root.leading ? center : left; vertical-alignment: center; overflow: elide;
@@ -80,7 +83,8 @@ component Glass inherits Rectangle {
 export component Launcher inherits Window {
     init => { Palette.color-scheme = Theme.light ? light : dark; }
     title: @tr("AmberL · 开发预览");
-    no-frame: true; resize-border-width: 6px;
+    no-frame: true; resize-border-width: 10px;
+    callback resize-window(); callback move-window();
     callback minimize(); callback maximize();
     callback appearance(bool);
     callback language(bool);
@@ -89,7 +93,7 @@ export component Launcher inherits Window {
         Palette.color-scheme = use-light ? light : dark;
     }
     background: #171c20; default-font-family: "Microsoft YaHei UI"; default-font-size: 16px;
-    preferred-width: 1280px; preferred-height: 820px; min-width: 1000px; min-height: 700px;
+    preferred-width: 1280px; preferred-height: 820px; min-width: 960px; min-height: 640px;
     in property <[GameRow]> games;
     in property <string> selected-id;
     in property <string> game-title: @tr("你的下一段冒险");
@@ -130,6 +134,11 @@ export component Launcher inherits Window {
     callback load-versions(); callback filter-versions(); callback pick-version(string); callback pick-loader(string);
     in-out property <int> budget-gib: 4;
     in-out property <int> panel: 0;
+    private property <float> reveal: 1;
+    private property <bool> entering: true;
+    animate reveal { duration: Theme.motion && root.entering ? 180ms : 0ms; easing: ease-out; }
+    changed panel => { entering = false; reveal = 0; reveal-timer.running = true; }
+    reveal-timer := Timer { interval: 16ms; running: false; triggered => { root.entering = true; root.reveal = 1; self.running = false; } }
     callback select-game(string); callback refresh(); callback add-library(); callback install-game();
     callback login(); callback logout(); callback open-microsoft(); callback discover-java();
     in-out property <int> java-download-index: 4;
@@ -201,22 +210,24 @@ export component Launcher inherits Window {
     // Explicit origins prevent Slint's automatic child centering from shifting the scene.
     Image { x: 0px; y: 0px; width: root.width; height: root.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
     Rectangle { x: 0px; y: 0px; width: root.width; height: root.height; background: #081b2528; }
-    WindowMoveArea { x: 6px; y: 6px; width: root.width - 12px; height: 84px; }
-    if root.panel == 0: Rectangle {
-        x: 0px; y: 0px; width: root.width; height: root.height; background: transparent;
+    TouchArea { pointer-event(event) => { if event.kind == down && event.button == left { root.move-window(); } } x: 6px; y: 6px; width: root.width - 12px; height: 84px; }
+    if root.panel == 0 || root.panel == 6: Rectangle { x: 0px; y: 0px; width: root.width; height: 90px;
         Glass {
             x: 24px; y: 20px; width: parent.width - 48px; height: 64px;
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
-            WindowMoveArea { x: 0px; y: 0px; width: parent.width; height: parent.height; }
+            TouchArea { pointer-event(event) => { if event.kind == down && event.button == left { root.move-window(); } } x: 0px; y: 0px; width: parent.width; height: parent.height; }
             Rectangle { x: 12px; y: 8px; width: 166px; height: 48px; background: Theme.light ? #173e35 : transparent; border-radius: 8px;
                 Image { x: 6px; y: 2px; width: 154px; height: 44px; source: @image-url("../../../assets/launcher/amberl-lockup-dark.png"); image-fit: contain; accessible-label: "AmberL"; }
             }
-            Action { x: 196px; y: 12px; width: 72px; height: 40px; label: @tr("游戏"); selected: true; clicked => { root.panel=0; } }
-            Action { x: 276px; y: 12px; width: Locale.english ? 110px : 72px; height: 40px; label: @tr("联机"); flat: true; clicked => { root.panel=6; } }
+            Action { x: 196px; y: 12px; width: 72px; height: 40px; label: @tr("游戏"); selected: root.panel == 0; clicked => { root.panel=0; } }
+            Action { x: 276px; y: 12px; width: Locale.english ? 110px : 72px; height: 40px; label: @tr("联机"); selected: root.panel == 6; flat: root.panel != 6; clicked => { root.panel=6; } }
             Action { x: parent.width - 360px; y: 12px; width: 72px; height: 40px; label: @tr("任务"); flat: true; clicked => { root.panel=5; } }
             Action { x: parent.width - 280px; y: 12px; width: 72px; height: 40px; label: @tr("设置"); flat: true; clicked => { root.panel=10; } }
             Action { x: parent.width - 200px; y: 12px; width: 72px; height: 40px; label: @tr("关于"); flat: true; clicked => { root.panel=7; } }
         }
+    }
+    if root.panel == 0: Rectangle {
+        x: 0px; y: 0px; width: root.width; height: root.height; background: transparent; opacity: root.reveal;
         Glass {
             x: parent.width - 368px; y: 108px; width: 344px; height: min(root.height - 310px, 152px + max(1, root.games.length) * 84px);
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
@@ -233,7 +244,7 @@ export component Launcher inherits Window {
                         accessible-action-default => { if !root.busy { root.select-game(game.id); } }
                         InstanceIcon { x: 12px; y: 12px; width: 54px; height: 54px; icon: game.icon; }
                         Text { vertical-stretch: 0; x: 80px; y: 14px; width: parent.width - 94px; height: 25px; text: game.title; color: Theme.text; font-size: 18px; font-weight: 600; overflow: elide; }
-                        Text { vertical-stretch: 0; x: 80px; y: 43px; width: parent.width - 94px; height: 20px; text: game.subtitle; color: Theme.secondary; font-size: 11px; overflow: elide; }
+                        Text { vertical-stretch: 0; x: 80px; y: 43px; width: parent.width - 94px; height: 20px; text: game.subtitle; color: Theme.secondary; font-size: 12px; overflow: elide; }
                         row-focus := FocusScope { enabled: !root.busy; key-pressed(event) => { if !event.modifiers.alt && !event.modifiers.control && !event.modifiers.meta && (event.text == "\n" || event.text == " ") { root.select-game(game.id); return accept; } return reject; } }
                         row-touch := TouchArea { enabled: !root.busy; clicked => { row-focus.focus(); root.select-game(game.id); } }
                     }
@@ -260,17 +271,28 @@ export component Launcher inherits Window {
                 clicked => { root.launch(); }
             }
         }
-        Text { vertical-stretch: 0; x: 30px; y: parent.height - 27px; width: parent.width - 60px; height: 20px; text: root.status; color: #a7c0bd; font-size: 11px; overflow: elide; }
+        if root.status != "": Text { vertical-stretch: 0; x: 30px; y: parent.height - 27px; width: parent.width - 60px; height: 20px; text: root.status; color: #a7c0bd; font-size: 12px; overflow: elide; }
     }
     if root.panel != 0: Rectangle {
-        x: 0px; y: 0px; width: root.width; height: root.height; background: #07151b64;
-        TouchArea { }
-        Glass { x: (parent.width - self.width)/2; y: root.panel == 6 || root.panel == 8 ? max(80px,(parent.height - self.height)/2) : (parent.height - self.height)/2; width: min(root.panel == 6 || root.panel == 8 ? 900px : 720px,parent.width - 80px);
-            height: min(root.panel == 6 || root.panel == 8 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 10 ? 460px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 || root.panel == 8 ? 140px : 100px));
+        x: 0px; y: 0px; width: root.width; height: root.height; background: root.panel == 6 ? transparent : #07151b64;
+        if root.panel != 6: TouchArea { }
+        Glass { x: root.panel == 6 ? 24px : (parent.width - self.width)/2; y: (root.panel == 6 ? 108px : (parent.height - self.height)/2); opacity: root.reveal; width: root.panel == 6 ? parent.width - 48px : min(root.panel == 8 ? 900px : 720px,parent.width - 80px);
+            height: root.panel == 6 ? parent.height - 132px : min(root.panel == 8 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 10 ? 460px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 || root.panel == 8 ? 140px : 100px));
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: Theme.dialog;
+                    if root.panel == 6: VerticalLayout { x: 20px; y: 28px; width: 172px; height: 356px; spacing: 8px;
+                        Action { height: 44px; leading: true; label: @tr("服务端"); selected: root.network-tab == 0; clicked => { root.network-tab=0; } }
+                        Action { height: 44px; leading: true; label: @tr("创建服务端"); selected: root.network-tab == 1; clicked => { root.network-tab=1; if root.server-versions.length == 0 && !root.busy { root.load-versions(); } } }
+                        Action { height: 44px; leading: true; label: @tr("邀请房间"); selected: root.network-tab == 2; clicked => { root.network-tab=2; } }
+                        Action { height: 44px; leading: true; label: @tr("加入游戏"); selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
+                        Action { height: 44px; leading: true; label: @tr("控制台"); selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
+                        Action { height: 44px; leading: true; label: @tr("备份恢复"); selected: root.network-tab == 5; clicked => { root.network-tab=5; root.refresh-servers(); } }
+                        Action { height: 44px; leading: true; label: "FRP"; selected: root.network-tab == 7; clicked => { root.network-tab=7; root.load-frp(); } }
+                    }
+
+            ScrollView { x: root.panel == 6 ? 196px : 0px; width: min(parent.width - self.x, root.panel == 6 ? 1120px : parent.width); height: parent.height; content-width: self.width;
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
-                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? @tr("微软账户") : root.panel == 2 ? @tr("启动配置") : root.panel == 3 ? @tr("添加游戏库") : root.panel == 4 ? @tr("安装游戏") : root.panel == 5 ? @tr("当前任务") : root.panel == 6 ? @tr("联机") : root.panel == 8 ? @tr("内容管理") : root.panel == 9 ? @tr("实例与备份") : root.panel == 10 ? @tr("设置") : root.panel == 11 ? @tr("游戏库详情与副本") : @tr("关于 AmberL"); color: Theme.text; font-size: 28px; font-weight: 600; }
+                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? @tr("微软账户") : root.panel == 2 ? @tr("启动配置") : root.panel == 3 ? @tr("添加游戏库") : root.panel == 4 ? @tr("安装游戏") : root.panel == 5 ? @tr("当前任务") : root.panel == 6 ? (root.network-tab == 0 ? @tr("服务端") : root.network-tab == 1 ? @tr("创建服务端") : root.network-tab == 2 ? @tr("邀请房间") : root.network-tab == 3 ? @tr("加入游戏") : root.network-tab == 4 ? @tr("控制台") : root.network-tab == 5 ? @tr("备份恢复") : "FRP") : root.panel == 8 ? @tr("内容管理") : root.panel == 9 ? @tr("实例与备份") : root.panel == 10 ? @tr("设置") : root.panel == 11 ? @tr("游戏库详情与副本") : @tr("关于 AmberL"); color: Theme.text; font-size: 28px; font-weight: 600; }
                     Action { width: Locale.english ? 150px : 100px; label: root.panel == 8 && root.content-server ? @tr("返回联机") : @tr("返回游戏"); clicked => { root.panel=root.panel == 8 && root.content-server ? 6 : 0; } }
                 }
                 if root.panel == 1: VerticalLayout {
@@ -413,15 +435,6 @@ export component Launcher inherits Window {
                     Text { vertical-stretch: 0; text: @tr("启动进程不等于已进入世界。取消运行中的游戏会请求正常退出，并等待游戏结束。"); color: Theme.secondary; wrap: word-wrap; }
                 }
                 if root.panel == 6: VerticalLayout { spacing: 12px; vertical-stretch: 0;
-                    HorizontalLayout { height: 40px; spacing: 8px;
-                        Action { label: @tr("服务端"); selected: root.network-tab == 0; clicked => { root.network-tab=0; } }
-                        Action { label: @tr("创建服务端"); selected: root.network-tab == 1; clicked => { root.network-tab=1; if root.server-versions.length == 0 && !root.busy { root.load-versions(); } } }
-                        Action { label: @tr("邀请房间"); selected: root.network-tab == 2; clicked => { root.network-tab=2; } }
-                        Action { label: @tr("加入游戏"); selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
-                        Action { label: @tr("控制台"); selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
-                        Action { label: @tr("备份恢复"); selected: root.network-tab == 5; clicked => { root.network-tab=5; root.refresh-servers(); } }
-                        Action { label: "FRP"; selected: root.network-tab == 7; clicked => { root.network-tab=7; root.load-frp(); } }
-                    }
                     if root.network-tab == 7: VerticalLayout { spacing: 12px;
                         Text { text: root.frp-status; color: Theme.accent; wrap: word-wrap; vertical-stretch: 0; }
                         Text { text: @tr("节点地址（主机:端口）"); color: Theme.secondary; vertical-stretch: 0; }
@@ -679,8 +692,14 @@ export component Launcher inherits Window {
                     if root.busy: Action { width: Locale.english ? 220px : 176px; height: 44px; label: root.running ? @tr("请求游戏正常退出") : @tr("取消当前操作"); clicked => { root.cancel(); } }
                 }
             }
+            }
         }
     }
+    TouchArea { pointer-event(event) => { if event.kind == down && event.button == left { root.move-window(); } } x: 12px; y: 4px; width: root.width - 24px; height: 16px; }
+    TouchArea { pointer-event(event) => { if event.kind == down && event.button == left { root.move-window(); } } x: 24px; y: 24px; width: 176px; height: 56px; }
+    TouchArea { pointer-event(event) => { if event.kind == down && event.button == left { root.move-window(); } } x: root.panel == 0 || root.panel == 6 ? 420px : 206px; y: 24px; width: max(0px, root.width - self.x - (root.panel == 0 || root.panel == 6 ? 410px : 168px)); height: 56px; }
+    Text { x: root.width - 22px; y: root.height - 24px; text: "◢"; color: #a7c0bd80; font-size: 15px; }
+    TouchArea { x: root.width - 26px; y: root.height - 26px; width: 26px; height: 26px; mouse-cursor: se-resize; pointer-event(event) => { if event.kind == down { root.resize-window(); } } }
     HorizontalLayout { x: root.width - 148px; y: 32px; width: 112px; height: 40px; spacing: 2px;
         Action { min-width: 34px; height: 40px; label: "−"; accessible-label: @tr("最小化"); flat: true; on-scene: root.panel != 0; clicked => { root.minimize(); } }
         Action { min-width: 34px; height: 40px; label: "□"; accessible-label: @tr("最大化或还原"); flat: true; on-scene: root.panel != 0; clicked => { root.maximize(); } }

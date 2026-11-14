@@ -102,6 +102,10 @@ fn refresh(ui: &Comparison, model: &Rc<RefCell<Model>>, view: &Rc<RefCell<View>>
     view.borrow_mut().revision = snapshot.revision;
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Preserve the original software comparison baseline. The launcher uses GPU rendering.
+    slint::BackendSelector::new()
+        .renderer_name("software".into())
+        .select()?;
     let ui = Comparison::new()?;
     let model = Rc::new(RefCell::new(Model::default()));
     let view = Rc::new(RefCell::new(View::default()));
