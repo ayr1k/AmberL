@@ -1,0 +1,2 @@
+https://raw.githubusercontent.com/mondeja/rspolib/8170d99ebad29d894712ccb3dc6d0be2198d3055/LICENSE
+Pinned to the crate cargo_vcs_info revision; original license omitted from the registry archive.

@@ -1,0 +1,690 @@
+// SPDX-License-Identifier: MPL-2.0
+import { Button, LineEdit, ComboBox, SpinBox, ListView, ScrollView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
+
+
+export struct GameRow { id: string, title: string, subtitle: string, icon: string }
+export struct VersionRow { id: string, kind: string }
+export struct OptionalRow { title: string, selected: bool }
+export global Locale {
+    in-out property <bool> english: false;
+}
+export global Theme {
+    in-out property <bool> light: false;
+    out property <color> text: light ? #183d35 : #f2f6f3;
+    out property <color> secondary: light ? #3d5d56 : #becacb;
+    out property <color> accent: light ? #12614d : #9ae3cc;
+    out property <color> glass: light ? #eff9f3dc : #11232fc2;
+    out property <color> dialog: light ? #f2faf5f2 : #10232dde;
+    out property <color> border: light ? #244e3e30 : #ffffff14;
+    out property <color> focus: light ? #146b55 : #c1f5e8;
+    out property <color> selection: light ? #13725d20 : #76ddbc2c;
+    out property <color> control: light ? #ffffff70 : #ffffff0c;
+    out property <color> hover: light ? #14725b20 : #ffffff20;
+    out property <color> disabled: light ? #687d77 : #b4c3c2;
+    out property <color> inset: light ? #ffffff60 : #06182148;
+}
+export global GlassAssets {
+    in-out property <bool> ready: false;
+    pure callback tile(float, float, float, float, float, float) -> image;
+}
+component Action inherits Rectangle {
+    in property <string> label;
+    in property <string> hint;
+    in property <bool> primary: false;
+    in property <bool> flat: false;
+    in property <bool> leading: false;
+    in property <bool> on-scene: false;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 44px; min-width: 64px; border-radius: 9px;
+    background: primary ? (!enabled ? #4c897c80 : touch.has-hover ? #86e5c9 : #62d6b4) : selected ? Theme.selection : touch.has-hover ? Theme.hover : flat ? transparent : Theme.control;
+    border-width: focus.has-focus ? 2px : primary || flat ? 0px : 1px;
+    border-color: focus.has-focus ? (on-scene ? #c1f5e8 : Theme.focus) : selected ? Theme.focus : Theme.border;
+    accessible-role: button; accessible-label: hint + " " + label; accessible-enabled: enabled;
+    accessible-action-default => { if enabled { root.clicked(); } }
+    if hint != "": Text { vertical-stretch: 0; x: 16px; y: 8px; width: parent.width - 32px; height: 16px; text: root.hint; color: Theme.secondary; font-size: 11px; overflow: elide; }
+    Text { vertical-stretch: 0; x: root.hint == "" ? 8px : 16px; y: root.hint == "" ? 0px : 26px; width: parent.width - (root.hint == "" ? 16px : 32px); height: root.hint == "" ? parent.height : 22px;
+        text: root.label; color: !root.enabled ? Theme.disabled : root.primary ? #102d27 : root.on-scene ? #f2f6f3 : Theme.text; font-size: root.primary ? 20px : 14px;
+        font-weight: root.primary || root.selected ? 600 : 400; horizontal-alignment: root.hint == "" && !root.leading ? center : left; vertical-alignment: center; overflow: elide;
+    }
+    focus := FocusScope { enabled: root.enabled;
+        key-pressed(event) => { if !event.modifiers.alt && !event.modifiers.control && !event.modifiers.meta && (event.text == "\n" || event.text == " ") { root.clicked(); return accept; } return reject; }
+    }
+    touch := TouchArea { enabled: root.enabled; clicked => { focus.focus(); root.clicked(); } }
+}
+component InstanceIcon inherits Rectangle {
+    in property <string> icon: "grass";
+    background: #8bdac016; border-radius: 8px;
+    Image { x: 6px; y: 6px; width: parent.width - 12px; height: parent.height - 12px; image-fit: contain;
+        source: root.icon == "anvil" ? @image-url("../../../assets/instance-icons/anvil.svg") : root.icon == "pickaxe" ? @image-url("../../../assets/instance-icons/pickaxe.svg") : root.icon == "dirt" ? @image-url("../../../assets/instance-icons/dirt.svg") : @image-url("../../../assets/instance-icons/grass.png");
+        colorize: root.icon == "grass" ? transparent : Theme.accent;
+    }
+}
+// Reuse one blurred full-scene texture; offsets keep the frosted view aligned on resize.
+component Glass inherits Rectangle {
+    in property <length> viewport-width;
+    in property <length> viewport-height;
+    in property <length> scene-x;
+    in property <length> scene-y;
+    in property <color> tint: Theme.glass;
+    border-radius: 15px; clip: true;
+    Image { x: 0px; y: 0px; width: parent.width; height: parent.height;
+        source: GlassAssets.ready ? GlassAssets.tile(root.scene-x / 1px, root.scene-y / 1px, root.width / 1px, root.height / 1px, root.viewport-width / 1px, root.viewport-height / 1px) : @image-url("");
+        image-fit: fill;
+    }
+    Rectangle { x: 0px; y: 0px; width: parent.width; height: parent.height; background: root.tint; border-radius: 15px; border-width: 1px; border-color: Theme.border; }
+    @children
+}
+
+export component Launcher inherits Window {
+    init => { Palette.color-scheme = Theme.light ? light : dark; }
+    title: @tr("AmberL · 开发预览");
+    no-frame: true; resize-border-width: 6px;
+    callback minimize(); callback maximize();
+    callback appearance(bool);
+    callback language(bool);
+    public function apply-appearance(use-light: bool) {
+        Theme.light = use-light;
+        Palette.color-scheme = use-light ? light : dark;
+    }
+    background: #171c20; default-font-family: "Microsoft YaHei UI"; default-font-size: 16px;
+    preferred-width: 1280px; preferred-height: 820px; min-width: 1000px; min-height: 700px;
+    in property <[GameRow]> games;
+    in property <string> selected-id;
+    in property <string> game-title: @tr("你的下一段冒险");
+    in property <string> game-subtitle: @tr("安装游戏，或添加已有游戏库");
+    in property <string> status;
+    in property <string> task-log;
+    in property <string> device-prompt;
+    in property <bool> busy;
+    in property <bool> running;
+    in property <bool> launch-candidate;
+    in property <bool> import-candidate;
+    in property <bool> import-shared;
+    in property <string> library-details;
+    in-out property <string> import-parent;
+    in-out property <string> import-name;
+    in-out property <bool> import-acknowledged: false;
+    callback import-game();
+    in property <[string]> account-options;
+    in property <string> account-label: @tr("登录微软账户");
+    in-out property <int> account-index: 0;
+    in property <[string]> java-options;
+    in-out property <int> java-index: 0;
+    in-out property <string> java-path;
+    in-out property <int> memory-mib: 4096;
+    in-out property <string> library-path;
+    in-out property <string> install-parent;
+    in-out property <string> install-name;
+    in-out property <string> install-version;
+    in property <[VersionRow]> versions;
+    in-out property <string> version-search;
+    in-out property <int> version-filter: 0;
+    in-out property <int> install-step: 0;
+    in-out property <string> install-title;
+    in-out property <string> install-icon: "grass";
+    in-out property <string> loader-kind: "原版";
+    in property <[string]> loader-options;
+    in-out property <int> loader-index: -1;
+    callback load-versions(); callback filter-versions(); callback pick-version(string); callback pick-loader(string);
+    in-out property <int> budget-gib: 4;
+    in-out property <int> panel: 0;
+    callback select-game(string); callback refresh(); callback add-library(); callback install-game();
+    callback login(); callback logout(); callback open-microsoft(); callback discover-java();
+    in-out property <int> java-download-index: 4;
+    callback install-java();
+    callback choose-account(int); callback choose-java(int); callback launch(); callback cancel(); callback open-folder();
+    callback save-config(); callback open-eula(); callback launch-join();
+    in-out property <int> network-tab: 0;
+    in property <[string]> server-options; in-out property <int> server-index: -1;
+    in property <[string]> server-versions; in-out property <int> server-version-index: -1;
+    in-out property <string> server-loader-kind: "原版";
+    in-out property <int> server-loader-kind-index: 0;
+    in property <[string]> server-loader-options; in-out property <int> server-loader-index: -1;
+    callback load-server-loaders();
+    in property <bool> network-busy; in property <bool> server-active; in property <bool> room-active; in property <bool> component-ready;
+    in property <bool> frp-active; in property <bool> frp-ready;
+    in property <string> frp-status;
+    in-out property <string> frp-server;
+    in-out property <string> frp-certificate;
+    in-out property <string> frp-token;
+    in-out property <int> frp-local-port: 25565;
+    in-out property <int> frp-remote-port: 25565;
+    callback load-frp(); callback install-frp(); callback start-frp(); callback stop-frp();
+    in property <string> network-status; in property <string> server-status; in property <string> room-status; in property <string> query-status;
+    in property <string> server-log; in property <string> room-invite; in property <string> room-address;
+    in-out property <string> server-name: @tr("好友的世界"); in-out property <int> server-port: 25565; in-out property <int> server-memory: 2048; in-out property <bool> server-eula: false;
+    in-out property <string> console-command;
+    in-out property <int> host-port: 25565; in-out property <int> guest-port: 25567;
+    in-out property <string> room-peer: "tcp://public.easytier.top:11010";
+    in-out property <string> invite-input; in-out property <string> join-target;
+    callback refresh-servers(); callback create-server(); callback choose-server(int); callback start-server(); callback stop-server(); callback server-command();
+    callback install-network(); callback host-room(); callback join-room(); callback leave-room(); callback probe-server();
+    in property <[string]> backup-options; in-out property <int> backup-index: -1;
+    in property <[string]> archived-options; in-out property <int> archived-index: -1;
+    in-out property <string> restore-name: @tr("恢复的世界"); in-out property <int> restore-port: 25568;
+    callback backup-server(); callback restore-backup(); callback archive-server(); callback restore-archived();
+    callback load-server-config(); callback save-server-config(); callback recover-server-config();
+    in property <bool> server-config-ready: false;
+    in-out property <string> server-motd;
+    in-out property <int> server-players: 8;
+    in-out property <int> server-distance: 8;
+    in-out property <string> server-difficulty: "easy";
+    in-out property <string> server-mode: "survival";
+    in property <string> content-target; in property <string> content-preview;
+    in property <bool> content-server;
+    in-out property <bool> content-match-game: true;
+    in-out property <bool> content-match-loader: true;
+    in property <bool> maintenance-has-target;
+    in property <string> maintenance-target;
+    in-out property <string> maintenance-name;
+    in-out property <int> maintenance-icon: 0;
+    in-out property <int> maintenance-tab: 0;
+    in property <[string]> client-backups;
+    in property <[string]> archived-games;
+    in-out property <int> client-backup-index: -1;
+    in-out property <int> archived-game-index: -1;
+    in-out property <string> client-restore-parent;
+    in-out property <string> client-restore-name: "recovered-game";
+    callback open-maintenance(); callback save-instance(); callback archive-instance();
+    callback backup-instance(); callback restore-instance(); callback unarchive-instance();
+    in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
+    in property <[string]> content-group-states;
+    in property <[OptionalRow]> content-optional;
+    callback select-optional(int, bool);
+    in-out property <int> content-project-index: -1; in-out property <int> content-version-index: -1; in-out property <int> content-group-index: -1;
+    in-out property <int> content-kind-index: 0; in-out property <int> content-step: 0; in-out property <int> content-tab: 0;
+    in-out property <string> content-query; in property <bool> content-has-plan;
+    callback open-content(bool); callback search-content(); callback content-project(); callback preview-content(); callback install-content(); callback change-content(string);
+
+    // Explicit origins prevent Slint's automatic child centering from shifting the scene.
+    Image { x: 0px; y: 0px; width: root.width; height: root.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
+    Rectangle { x: 0px; y: 0px; width: root.width; height: root.height; background: #081b2528; }
+    WindowMoveArea { x: 6px; y: 6px; width: root.width - 12px; height: 84px; }
+    if root.panel == 0: Rectangle {
+        x: 0px; y: 0px; width: root.width; height: root.height; background: transparent;
+        Glass {
+            x: 24px; y: 20px; width: parent.width - 48px; height: 64px;
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
+            WindowMoveArea { x: 0px; y: 0px; width: parent.width; height: parent.height; }
+            Rectangle { x: 12px; y: 8px; width: 166px; height: 48px; background: Theme.light ? #173e35 : transparent; border-radius: 8px;
+                Image { x: 6px; y: 2px; width: 154px; height: 44px; source: @image-url("../../../assets/launcher/amberl-lockup-dark.png"); image-fit: contain; accessible-label: "AmberL"; }
+            }
+            Action { x: 196px; y: 12px; width: 72px; height: 40px; label: @tr("游戏"); selected: true; clicked => { root.panel=0; } }
+            Action { x: 276px; y: 12px; width: Locale.english ? 110px : 72px; height: 40px; label: @tr("联机"); flat: true; clicked => { root.panel=6; } }
+            Action { x: parent.width - 360px; y: 12px; width: 72px; height: 40px; label: @tr("任务"); flat: true; clicked => { root.panel=5; } }
+            Action { x: parent.width - 280px; y: 12px; width: 72px; height: 40px; label: @tr("设置"); flat: true; clicked => { root.panel=10; } }
+            Action { x: parent.width - 200px; y: 12px; width: 72px; height: 40px; label: @tr("关于"); flat: true; clicked => { root.panel=7; } }
+        }
+        Glass {
+            x: parent.width - 368px; y: 108px; width: 344px; height: min(root.height - 310px, 152px + max(1, root.games.length) * 84px);
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y;
+            Text { vertical-stretch: 0; x: 20px; y: 20px; width: 220px; height: 30px; text: @tr("我的游戏"); color: Theme.text; font-size: 22px; font-weight: 600; }
+            Action { x: parent.width - self.width - 16px; y: 16px; width: Locale.english ? 88px : 60px; height: 36px; label: @tr("刷新"); flat: true; enabled: !root.busy; clicked => { root.refresh(); } }
+            if root.games.length == 0: Text { vertical-stretch: 0; x: 20px; y: 76px; width: parent.width - 40px; text: @tr("还没有游戏\n安装一个原版，或添加已有游戏库。"); color: Theme.secondary; font-size: 14px; wrap: word-wrap; }
+            if root.games.length > 0: ListView {
+                x: 12px; y: 68px; width: parent.width - 24px; height: parent.height - 136px;
+                    for game in root.games: Rectangle {
+                        height: 78px; border-radius: 10px;
+                        background: root.selected-id == game.id ? Theme.selection : row-touch.has-hover ? Theme.border : transparent;
+                        border-width: row-focus.has-focus || root.selected-id == game.id ? 1px : 0px; border-color: Theme.focus;
+                        accessible-role: button; accessible-label: game.title + " " + game.subtitle; accessible-enabled: !root.busy;
+                        accessible-action-default => { if !root.busy { root.select-game(game.id); } }
+                        InstanceIcon { x: 12px; y: 12px; width: 54px; height: 54px; icon: game.icon; }
+                        Text { vertical-stretch: 0; x: 80px; y: 14px; width: parent.width - 94px; height: 25px; text: game.title; color: Theme.text; font-size: 18px; font-weight: 600; overflow: elide; }
+                        Text { vertical-stretch: 0; x: 80px; y: 43px; width: parent.width - 94px; height: 20px; text: game.subtitle; color: Theme.secondary; font-size: 11px; overflow: elide; }
+                        row-focus := FocusScope { enabled: !root.busy; key-pressed(event) => { if !event.modifiers.alt && !event.modifiers.control && !event.modifiers.meta && (event.text == "\n" || event.text == " ") { root.select-game(game.id); return accept; } return reject; } }
+                        row-touch := TouchArea { enabled: !root.busy; clicked => { row-focus.focus(); root.select-game(game.id); } }
+                    }
+            }
+            HorizontalLayout { x: 16px; y: parent.height - 56px; width: parent.width - 32px; height: 40px; spacing: 8px;
+                Action { height: 40px; label: @tr("安装游戏"); enabled: !root.busy; clicked => { root.panel=4; if root.versions.length == 0 { root.load-versions(); } } }
+                Action { height: 40px; label: @tr("添加游戏库"); enabled: !root.busy; clicked => { root.panel=3; } }
+            }
+        }
+        Rectangle { x: 48px; y: parent.height - 304px; width: parent.width - 464px; height: 144px; background: transparent;
+            Text { vertical-stretch: 0; x: 0px; y: 0px; width: parent.width; height: 20px; text: "MINECRAFT / JAVA EDITION"; color: #c2dbd2; font-size: 12px; letter-spacing: 2px; }
+            Text { vertical-stretch: 0; x: 0px; y: 31px; width: parent.width; height: 70px; text: root.game-title; color: #f3f6ee; font-size: root.width < 1150px ? 38px : 48px; font-weight: 700; overflow: elide; }
+            Text { vertical-stretch: 0; x: 0px; y: 112px; width: parent.width; height: 26px; text: root.game-subtitle; color: #d0ded8; font-size: 16px; overflow: elide; }
+        }
+        Glass {
+            x: 24px; y: parent.height - 136px; width: parent.width - 48px; height: 100px;
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: Theme.glass;
+            Action { x: 18px; y: 22px; width: 180px; height: 56px; hint: @tr("微软账户"); label: root.account-label; clicked => { root.panel=1; } }
+            Action { x: 208px; y: 22px; width: 140px; height: 56px; hint: @tr("JAVA 运行环境"); label: root.java-path == "" ? @tr("选择 Java") : @tr("已选择 Java"); enabled: !root.busy; clicked => { root.panel=2; } }
+            Action { x: 358px; y: 22px; width: 132px; height: 56px; hint: @tr("最大内存"); label: root.memory-mib + " MiB"; enabled: !root.busy; clicked => { root.panel=2; } }
+            Action { x: parent.width - 236px - self.width; y: 22px; width: Locale.english ? 108px : 76px; height: 56px; label: @tr("配置"); flat: true; enabled: !root.busy; clicked => { root.panel=2; } }
+            Action { x: parent.width - 226px; y: 22px; width: 208px; height: 56px; primary: true; label: root.running ? @tr("游戏运行中") : root.busy ? @tr("正在处理…") : @tr("启动游戏");
+                enabled: !root.busy && root.launch-candidate && root.account-index > 0 && root.java-path != "";
+                clicked => { root.launch(); }
+            }
+        }
+        Text { vertical-stretch: 0; x: 30px; y: parent.height - 27px; width: parent.width - 60px; height: 20px; text: root.status; color: #a7c0bd; font-size: 11px; overflow: elide; }
+    }
+    if root.panel != 0: Rectangle {
+        x: 0px; y: 0px; width: root.width; height: root.height; background: #07151b64;
+        TouchArea { }
+        Glass { x: (parent.width - self.width)/2; y: root.panel == 6 || root.panel == 8 ? max(80px,(parent.height - self.height)/2) : (parent.height - self.height)/2; width: min(root.panel == 6 || root.panel == 8 ? 900px : 720px,parent.width - 80px);
+            height: min(root.panel == 6 || root.panel == 8 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 10 ? 460px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 || root.panel == 8 ? 140px : 100px));
+            viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: Theme.dialog;
+            VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
+                HorizontalLayout { height: 44px; spacing: 24px;
+                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? @tr("微软账户") : root.panel == 2 ? @tr("启动配置") : root.panel == 3 ? @tr("添加游戏库") : root.panel == 4 ? @tr("安装游戏") : root.panel == 5 ? @tr("当前任务") : root.panel == 6 ? @tr("联机") : root.panel == 8 ? @tr("内容管理") : root.panel == 9 ? @tr("实例与备份") : root.panel == 10 ? @tr("设置") : root.panel == 11 ? @tr("游戏库详情与副本") : @tr("关于 AmberL"); color: Theme.text; font-size: 28px; font-weight: 600; }
+                    Action { width: Locale.english ? 150px : 100px; label: root.panel == 8 && root.content-server ? @tr("返回联机") : @tr("返回游戏"); clicked => { root.panel=root.panel == 8 && root.content-server ? 6 : 0; } }
+                }
+                if root.panel == 1: VerticalLayout {
+                    vertical-stretch: 0;
+                    spacing: 16px;
+                    Text { vertical-stretch: 0; text: @tr("登录由微软官方网页完成。账户保存在当前 Windows 用户的安全存储中。"); wrap: word-wrap; color: Theme.secondary; }
+                    Text { vertical-stretch: 0; text: @tr("当前账户"); color: Theme.text; font-size: 13px; }
+                    ComboBox { height: 40px; model: root.account-options; current-index <=> root.account-index; enabled: !root.busy; selected(value) => { root.choose-account(self.current-index); } }
+                    HorizontalLayout { spacing: 12px; height: 44px;
+                        Action { label: @tr("登录微软账户"); enabled: !root.busy; clicked => { root.login(); } }
+                        Action { label: @tr("退出所选账户"); enabled: !root.busy && root.account-index > 0; clicked => { root.logout(); } }
+                    }
+                    if root.device-prompt != "": TextEdit { text: root.device-prompt; read-only: true; accessible-label: @tr("微软设备登录信息"); height: 190px; }
+                    if root.device-prompt != "": Button { text: @tr("打开微软官方登录页面"); clicked => { root.open-microsoft(); } }
+                    Text { vertical-stretch: 0; text: @tr("退出只移除本机登录信息，不退出已经运行的游戏。"); color: Theme.secondary; wrap: word-wrap; }
+                }
+                if root.panel == 2: VerticalLayout {
+                    spacing: 12px;
+                    Text { vertical-stretch: 0; text: @tr("为当前游戏保存 Java、账户选择和内存，重新打开后恢复。"); color: Theme.secondary; wrap: word-wrap; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: root.java-options; current-index <=> root.java-index; enabled: !root.busy; selected(value) => { root.choose-java(self.current-index); } }
+                        Button { width: 140px; text: @tr("查找本机 Java"); enabled: !root.busy; clicked => { root.discover-java(); } }
+                    }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: ["Java 8", "Java 16", "Java 17", "Java 21", "Java 25"]; current-index <=> root.java-download-index; enabled: !root.busy; }
+                        Button { text: @tr("下载官方 Java"); enabled: !root.busy; clicked => { root.install-java(); } }
+                    }
+                    Text { vertical-stretch: 0; text: @tr("Java 可执行文件（java.exe）"); color: Theme.text; }
+                    LineEdit { height: 40px; text <=> root.java-path; enabled: !root.busy; accessible-label: @tr("Java 可执行文件"); }
+                    HorizontalLayout { spacing: 16px; height: 40px; Text { vertical-stretch: 0; vertical-alignment: center; text: @tr("最大内存（MiB）"); color: Theme.text; } SpinBox { value <=> root.memory-mib; minimum: 512; maximum: 65536; enabled: !root.busy; } }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Button { text: @tr("打开游戏目录"); enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
+                        Button { text: @tr("模组与资源"); enabled: !root.busy && root.launch-candidate; clicked => { root.open-content(false); } }
+                        Button { text: @tr("保存启动配置"); enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
+                    }
+                    Text { vertical-stretch: 0; text: @tr("只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"); color: Theme.secondary; wrap: word-wrap; }
+                    Action { height: 40px; label: root.selected-id != "" && !root.launch-candidate ? @tr("游戏库详情与副本") : @tr("实例与备份"); enabled: !root.busy; clicked => { if root.selected-id != "" && !root.launch-candidate { root.import-acknowledged=false; root.panel=11; } else { root.open-maintenance(); } } }
+                }
+                if root.panel == 11: ScrollView { content-width: self.width;
+                  VerticalLayout { spacing: 10px;
+                    Text { text: root.game-title + " · " + root.game-subtitle; color: Theme.text; font-size: 14px; overflow: elide; }
+                    TextEdit { height: 90px; font-size: 13px; text: root.library-details; read-only: true; accessible-label: @tr("来源路径与隔离证据"); }
+                    Text { text: root.import-candidate ? @tr("可创建独立原版副本。原库只读，不直接启动或修改；隔离未知、冲突或模组加载器暂不支持导入。") : @tr("仅可查看。隔离位置未知、冲突或模组加载器不支持导入，请先在原启动器核对配置并重新扫描。"); color: Theme.secondary; font-size: 12px; wrap: word-wrap; }
+                    Text { text: @tr("复制存档、资源包、截图和设置文件；官方游戏资源重新校验下载。不会复制账户、启动器配置或模组。总计最多 16 GiB，请先关闭来源游戏。"); color: Theme.secondary; font-size: 12px; wrap: word-wrap; }
+                    Text { text: @tr("副本父目录 · 与原库分离的已有文件夹"); color: Theme.text; font-size: 13px; }
+                    LineEdit { height: 36px; text <=> root.import-parent; enabled: root.import-candidate && !root.busy; accessible-label: @tr("副本父目录"); }
+                    Text { text: @tr("副本名称（同时作为新文件夹名）"); color: Theme.text; font-size: 13px; }
+                    LineEdit { height: 36px; text <=> root.import-name; enabled: root.import-candidate && !root.busy; accessible-label: @tr("副本文件夹名称"); }
+                    if root.import-shared: CheckBox { text: @tr("确认复制共享目录的全部存档与设置"); checked <=> root.import-acknowledged; enabled: !root.busy; }
+                    Action { height: 44px; label: @tr("创建独立副本"); selected: true; enabled: root.import-candidate && !root.busy && root.import-parent != "" && root.import-name != "" && (!root.import-shared || root.import-acknowledged); clicked => { root.import-game(); } }
+                  }
+                }
+                if root.panel == 3: VerticalLayout {
+                    spacing: 18px;
+                    Text { vertical-stretch: 0; text: @tr("填写 .minecraft 或 AmberL 安装目录。只保存位置，不移动、删除或导入原文件。"); color: Theme.secondary; wrap: word-wrap; }
+                    LineEdit { height: 40px; text <=> root.library-path; placeholder-text: @tr("游戏库完整路径"); accessible-label: @tr("游戏库完整路径"); enabled: !root.busy; }
+                    Button { text: @tr("登记并扫描"); enabled: !root.busy && root.library-path != ""; clicked => { root.add-library(); } }
+                }
+                if root.panel == 4: VerticalLayout {
+                    vertical-stretch: 0;
+                    spacing: 14px;
+                    HorizontalLayout { height: 32px; spacing: 8px;
+                        Text { vertical-stretch: 0; text: @tr("01  游戏版本"); color: root.install-step == 0 ? Theme.accent : Theme.secondary; font-size: 13px; vertical-alignment: center; }
+                        Text { vertical-stretch: 0; text: @tr("02  组件"); color: root.install-step == 1 ? Theme.accent : Theme.secondary; font-size: 13px; vertical-alignment: center; }
+                        Text { vertical-stretch: 0; text: @tr("03  名称与位置"); color: root.install-step == 2 ? Theme.accent : Theme.secondary; font-size: 13px; vertical-alignment: center; }
+                    }
+                    if root.install-step == 0: VerticalLayout { spacing: 12px;
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { placeholder-text: @tr("搜索版本，例如 1.21.1"); text <=> root.version-search; edited => { root.filter-versions(); } accessible-label: @tr("搜索游戏版本"); }
+                            ComboBox { width: 128px; model: [@tr("正式版"), @tr("快照版"), @tr("历史版本"), @tr("全部版本")]; current-index <=> root.version-filter; selected(value) => { root.filter-versions(); } }
+                            Action { width: 76px; height: 40px; label: @tr("刷新"); enabled: !root.busy; clicked => { root.load-versions(); } }
+                        }
+                        Rectangle { height: min(260px, root.height - 520px); border-radius: 10px; background: Theme.inset; border-width: 1px; border-color: Theme.border;
+                            ListView { x: 8px; y: 8px; width: parent.width - 16px; height: parent.height - 16px;
+                                for version in root.versions: Action { height: 44px; label: version.id; leading: true; selected: root.install-version == version.id; flat: true; enabled: !root.busy; clicked => { root.pick-version(version.id); } }
+                            }
+                            if root.versions.length == 0: Text { vertical-stretch: 0; x: 20px; y: 100px; width: parent.width - 40px; text: root.busy ? @tr("正在读取官方版本列表…") : @tr("没有匹配的版本，可清除搜索或重试刷新。"); horizontal-alignment: center; color: Theme.secondary; font-size: 14px; }
+                        }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: root.install-version == "" ? @tr("从列表选择一个游戏版本") : @tr("已选择 Minecraft ") + root.install-version; color: Theme.secondary; font-size: 14px; vertical-alignment: center; }
+                            Action { width: 148px; label: @tr("下一步 · 组件"); selected: true; enabled: !root.busy && root.install-version != ""; clicked => { root.install-step=1; } }
+                        }
+                    }
+                    if root.install-step == 1: VerticalLayout { spacing: 18px;
+                        Text { vertical-stretch: 0; text: "Minecraft " + root.install-version; color: Theme.text; font-size: 20px; }
+                        Text { vertical-stretch: 0; text: @tr("选择一个加载器，或保留原版。列表来自对应项目的官方来源。"); color: Theme.secondary; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 44px; spacing: 8px;
+                            for kind in ["原版", "Fabric", "Forge", "Quilt", "NeoForge"]: Action { label: kind == "原版" ? @tr("原版") : kind; selected: root.loader-kind == kind; enabled: !root.busy; clicked => { root.pick-loader(kind); } }
+                        }
+                        if root.loader-kind != "原版": VerticalLayout { spacing: 8px;
+                            Text { vertical-stretch: 0; text: root.loader-kind + @tr(" 版本"); color: Theme.text; font-size: 13px; }
+                            ComboBox { height: 40px; model: root.loader-options; current-index <=> root.loader-index; enabled: !root.busy; }
+                            Text { vertical-stretch: 0; text: root.busy ? @tr("正在读取兼容版本…") : root.loader-options.length == 0 ? @tr("该游戏版本暂无可用结果，可切换加载器或重试。") : @tr("安装时会再次核验兼容关系与下载文件。"); wrap: word-wrap; color: Theme.secondary; font-size: 13px; }
+                        }
+                        Text { vertical-stretch: 0; text: root.loader-kind == "Forge" || root.loader-kind == "NeoForge" ? @tr("需要先在启动配置中选择匹配的 Java。旧式 Forge 安装器暂不支持。") : root.loader-kind == "原版" ? @tr("不安装额外加载器，直接使用 Minecraft 原版客户端。") : @tr("仅安装加载器；Fabric API、QSL 等模组需按模组要求另行安装。"); color: Theme.secondary; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: @tr("上一步"); enabled: !root.busy; clicked => { root.install-step=0; } }
+                            Action { label: @tr("下一步 · 名称与位置"); selected: true; enabled: !root.busy && (root.loader-kind == "原版" || root.loader-index >= 0); clicked => { root.install-step=2; } }
+                        }
+                    }
+                    if root.install-step == 2: VerticalLayout { spacing: root.height < 760px ? 8px : 12px;
+                        HorizontalLayout { height: 64px; spacing: 16px;
+                            InstanceIcon { width: 64px; height: 64px; icon: root.install-icon; }
+                            VerticalLayout { spacing: 4px;
+                                Text { vertical-stretch: 0; text: @tr("游戏名称"); color: Theme.text; font-size: 13px; }
+                                LineEdit { height: 40px; text <=> root.install-title; accessible-label: @tr("游戏显示名称"); enabled: !root.busy; }
+                            }
+                        }
+                        HorizontalLayout { height: 52px; spacing: 8px;
+                            for icon in ["grass","dirt","anvil","pickaxe"]: Rectangle { border-radius: 9px; border-width: 1px; border-color: root.install-icon == icon ? Theme.accent : Theme.border;
+                                InstanceIcon { x: 8px; y: 6px; width: 40px; height: 40px; icon: icon; }
+                                TouchArea { x: 0px; y: 0px; width: 48px; height: parent.height; enabled: !root.busy; clicked => { root.install-icon=icon; } }
+                                Action { x: 48px; y: 4px; width: parent.width - 52px; height: 44px; label: icon == "grass" ? @tr("草方块") : icon == "dirt" ? @tr("土方块") : icon == "anvil" ? @tr("铁砧") : @tr("铁镐"); flat: true; enabled: !root.busy; clicked => { root.install-icon=icon; } }
+                            }
+                        }
+                        VerticalLayout { spacing: 6px;
+                            Text { vertical-stretch: 0; text: @tr("安装父目录 · 选择一个已有文件夹"); color: Theme.text; font-size: 13px; }
+                            LineEdit { height: 40px; text <=> root.install-parent; enabled: !root.busy; accessible-label: @tr("安装父目录"); }
+                        }
+                        HorizontalLayout { spacing: 16px;
+                            VerticalLayout { spacing: 6px;
+                                Text { vertical-stretch: 0; text: @tr("独立文件夹名称"); color: Theme.text; font-size: 13px; }
+                                LineEdit { height: 40px; text <=> root.install-name; enabled: !root.busy; accessible-label: @tr("新安装文件夹名称"); }
+                            }
+                            VerticalLayout { width: 164px; spacing: 6px;
+                                Text { vertical-stretch: 0; text: @tr("空间预算（GiB）"); color: Theme.text; font-size: 13px; }
+                                SpinBox { height: 40px; value <=> root.budget-gib; minimum: 1; maximum: 128; enabled: !root.busy; }
+                            }
+                        }
+                        Text { vertical-stretch: 0; text: "Minecraft " + root.install-version + " · " + (root.loader-kind == "原版" ? @tr("原版") : root.loader-kind) + @tr(" · 创建独立目录，不覆盖同名游戏。"); color: Theme.secondary; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { width: 108px; label: @tr("上一步"); enabled: !root.busy; clicked => { root.install-step=1; } }
+                            Action { label: @tr("下载并安装"); primary: true; enabled: !root.busy && root.install-parent != "" && root.install-title != "" && root.install-name != ""; clicked => { root.install-game(); } }
+                        }
+                    }
+                }
+                if root.panel == 5: VerticalLayout {
+                    spacing: 12px;
+                    TextEdit { text: root.task-log; read-only: true; accessible-label: @tr("任务记录"); height: min(320px,root.height - 400px); }
+                    Text { vertical-stretch: 0; text: @tr("启动进程不等于已进入世界。取消运行中的游戏会请求正常退出，并等待游戏结束。"); color: Theme.secondary; wrap: word-wrap; }
+                }
+                if root.panel == 6: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    HorizontalLayout { height: 40px; spacing: 8px;
+                        Action { label: @tr("服务端"); selected: root.network-tab == 0; clicked => { root.network-tab=0; } }
+                        Action { label: @tr("创建服务端"); selected: root.network-tab == 1; clicked => { root.network-tab=1; if root.server-versions.length == 0 && !root.busy { root.load-versions(); } } }
+                        Action { label: @tr("邀请房间"); selected: root.network-tab == 2; clicked => { root.network-tab=2; } }
+                        Action { label: @tr("加入游戏"); selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
+                        Action { label: @tr("控制台"); selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
+                        Action { label: @tr("备份恢复"); selected: root.network-tab == 5; clicked => { root.network-tab=5; root.refresh-servers(); } }
+                        Action { label: "FRP"; selected: root.network-tab == 7; clicked => { root.network-tab=7; root.load-frp(); } }
+                    }
+                    if root.network-tab == 7: VerticalLayout { spacing: 12px;
+                        Text { text: root.frp-status; color: Theme.accent; wrap: word-wrap; vertical-stretch: 0; }
+                        Text { text: @tr("节点地址（主机:端口）"); color: Theme.secondary; vertical-stretch: 0; }
+                        LineEdit { text <=> root.frp-server; placeholder-text: "frp.example.com:7000"; accessible-label: @tr("FRP 节点地址"); enabled: !root.frp-active && !root.network-busy; }
+                        Text { text: @tr("节点 CA 证书（PEM 文件路径）"); color: Theme.secondary; vertical-stretch: 0; }
+                        LineEdit { text <=> root.frp-certificate; accessible-label: @tr("FRP 节点证书"); enabled: !root.frp-active && !root.network-busy; }
+                        LineEdit { text <=> root.frp-token; input-type: password; placeholder-text: @tr("节点令牌 · 留空使用已保存令牌"); accessible-label: @tr("FRP 节点令牌"); enabled: !root.frp-active && !root.network-busy; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: @tr("本地游戏端口"); color: Theme.secondary; vertical-alignment: center; }
+                            SpinBox { value <=> root.frp-local-port; minimum: 1024; maximum: 65535; enabled: !root.frp-active; }
+                            Text { text: @tr("节点公开端口"); color: Theme.secondary; vertical-alignment: center; }
+                            SpinBox { value <=> root.frp-remote-port; minimum: 1024; maximum: 65535; enabled: !root.frp-active; }
+                        }
+                        Text { text: @tr("启动后，节点会将公开端口转发到指定的本地游戏端口。FRP 与游戏、服务端独立启停；令牌保存在系统安全存储中。"); color: Theme.secondary; wrap: word-wrap; vertical-stretch: 0; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: root.frp-ready ? @tr("校验 FRP 组件") : @tr("下载 FRP 组件"); enabled: !root.network-busy && !root.frp-active; clicked => { root.install-frp(); } }
+                            Action { label: @tr("保存并启动"); selected: true; enabled: root.frp-ready && !root.network-busy && !root.frp-active && root.frp-server != "" && root.frp-certificate != ""; clicked => { root.start-frp(); } }
+                            Action { label: @tr("停止 FRP"); enabled: root.frp-active; clicked => { root.stop-frp(); } }
+                        }
+                    }
+                    if root.network-tab == 0: VerticalLayout { spacing: 16px;
+                        Text { vertical-stretch: 0; text: @tr("我的独立服务端"); color: Theme.text; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { model: root.server-options; current-index <=> root.server-index; enabled: !root.server-active && !root.network-busy; selected(value) => { root.choose-server(self.current-index); } }
+                            Action { width: 96px; label: @tr("刷新"); enabled: !root.network-busy; clicked => { root.refresh-servers(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.server-status; color: Theme.accent; wrap: word-wrap; }
+                        HorizontalLayout { height: 40px; spacing: 16px;
+                            Text { vertical-stretch: 0; text: @tr("服务端内存（MiB）"); color: Theme.text; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-memory; minimum: 512; maximum: 65536; enabled: !root.server-active; }
+                            Action { width: 160px; label: @tr("选择 Java"); clicked => { root.panel=2; } }
+                        }
+                        Text { vertical-stretch: 0; text: root.java-path == "" ? @tr("请先选择兼容的 java.exe") : root.java-path; color: Theme.secondary; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: @tr("启动服务端"); selected: true; enabled: !root.network-busy && !root.server-active && root.server-index >= 0 && root.java-path != ""; clicked => { root.start-server(); } }
+                            Action { label: @tr("保存并停止"); enabled: root.server-active; clicked => { root.stop-server(); } }
+                        }
+                        Text { vertical-stretch: 0; text: @tr("服务端与游戏可同时运行。只监听本机，启用正版验证；使用邀请房间与朋友连接。"); color: Theme.secondary; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: @tr("管理模组与插件"); enabled: !root.busy && !root.server-active && root.server-index >= 0; clicked => { root.open-content(true); } }
+                            Action { label: @tr("服务端配置"); enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.network-tab=6; root.load-server-config(); } }
+                        }
+                    }
+                    if root.network-tab == 6: VerticalLayout { spacing: 12px;
+                        Text { text: @tr("服务端配置 · 停服后保存"); color: Theme.text; vertical-stretch: 0; }
+                        Text { text: @tr("服务器描述"); color: Theme.secondary; vertical-stretch: 0; }
+                        LineEdit { text <=> root.server-motd; accessible-label: @tr("服务器描述"); enabled: root.server-config-ready && !root.network-busy; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: @tr("人数上限"); color: Theme.secondary; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-players; minimum: 1; maximum: 1000; enabled: root.server-config-ready && !root.network-busy; }
+                            Text { text: @tr("视距"); color: Theme.secondary; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-distance; minimum: 2; maximum: 32; enabled: root.server-config-ready && !root.network-busy; }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: @tr("难度"); color: Theme.secondary; vertical-alignment: center; }
+                            ComboBox { model: ["peaceful", "easy", "normal", "hard"]; current-value <=> root.server-difficulty; enabled: root.server-config-ready && !root.network-busy; }
+                            Text { text: @tr("模式"); color: Theme.secondary; vertical-alignment: center; }
+                            ComboBox { model: ["survival", "creative", "adventure", "spectator"]; current-value <=> root.server-mode; enabled: root.server-config-ready && !root.network-busy; }
+                        }
+                        Text { text: @tr("保存时检查外部修改，并保留恢复副本。若写入中断，先恢复配置再启动。"); color: Theme.secondary; wrap: word-wrap; vertical-stretch: 0; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: @tr("重新读取"); enabled: !root.network-busy; clicked => { root.load-server-config(); } }
+                            Action { label: @tr("保存配置"); selected: true; enabled: root.server-config-ready && !root.network-busy; clicked => { root.save-server-config(); } }
+                            Action { label: @tr("恢复中断写入"); enabled: !root.network-busy; clicked => { root.recover-server-config(); } }
+                        }
+                    }
+                    if root.network-tab == 1: VerticalLayout { spacing: 12px;
+                        Text { vertical-stretch: 0; text: @tr("游戏版本与加载器"); color: Theme.text; font-size: 13px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { model: root.server-versions; current-index <=> root.server-version-index; enabled: !root.network-busy; }
+                            Action { width: 96px; label: @tr("更新列表"); enabled: !root.busy; clicked => { root.load-versions(); } }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { width: 160px; model: [@tr("原版"), "Fabric", "Quilt", "Forge", "NeoForge", "Paper"]; current-index <=> root.server-loader-kind-index; enabled: !root.network-busy; selected(value) => { root.server-loader-kind=["原版", "Fabric", "Quilt", "Forge", "NeoForge", "Paper"][self.current-index]; } }
+                            ComboBox { model: root.server-loader-options; current-index <=> root.server-loader-index; enabled: !root.network-busy && root.server-loader-kind != "原版"; }
+                            Action { width: Locale.english ? 152px : 96px; label: @tr("加载器列表"); enabled: !root.network-busy && root.server-version-index >= 0 && root.server-loader-kind != "原版"; clicked => { root.load-server-loaders(); } }
+                        }
+                        Text { vertical-stretch: 0; text: @tr("名称与监听端口"); color: Theme.text; font-size: 13px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.server-name; accessible-label: @tr("服务端名称"); enabled: !root.network-busy; }
+                            SpinBox { width: 160px; value <=> root.server-port; minimum: 1024; maximum: 65535; enabled: !root.network-busy; }
+                        }
+                        Text { vertical-stretch: 0; text: @tr("存档保存在 AmberL 独立应用目录中。只新建服务端，不导入或覆盖现有世界。"); color: Theme.secondary; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            CheckBox { text: @tr("我已阅读并同意 Minecraft EULA"); checked <=> root.server-eula; enabled: !root.network-busy; }
+                            Action { width: 100px; label: @tr("阅读 EULA"); flat: true; clicked => { root.open-eula(); } }
+                        }
+                        Action { label: @tr("下载并创建服务端"); selected: true; enabled: !root.network-busy && root.server-eula && root.server-version-index >= 0 && root.server-name != ""; clicked => { root.create-server(); } }
+                    }
+                    if root.network-tab == 2: VerticalLayout { spacing: 12px;
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: root.component-ready ? @tr("EasyTier 2.6.4 · 运行前校验") : @tr("下载联机组件后即可创建和加入房间"); color: Theme.secondary; vertical-alignment: center; font-size: 14px; }
+                            Action { width: Locale.english ? 224px : 132px; label: @tr("下载联机组件"); enabled: !root.network-busy && !root.room-active; clicked => { root.install-network(); } }
+                        }
+                        Text { vertical-stretch: 0; text: @tr("连接节点（可修改为自己的 EasyTier 节点）"); color: Theme.text; font-size: 13px; }
+                        LineEdit { height: 40px; text <=> root.room-peer; enabled: !root.room-active; accessible-label: @tr("EasyTier 连接节点"); }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: @tr("共享本机 Minecraft 端口"); color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                            SpinBox { width: 140px; value <=> root.host-port; minimum: 1024; maximum: 65535; enabled: !root.room-active; }
+                            Action { label: @tr("创建邀请"); enabled: root.component-ready && !root.room-active && !root.network-busy; clicked => { root.host-room(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.room-status; color: Theme.accent; wrap: word-wrap; font-size: 14px; }
+                        TextEdit { height: 72px; text: root.room-invite; read-only: true; accessible-label: @tr("房间邀请，选择并复制给朋友"); }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: @tr("邀请含加入密钥，24 小时有效，仅发给信任的朋友。关闭房间立即断开转发。"); color: Theme.secondary; wrap: word-wrap; font-size: 13px; }
+                            Action { width: 128px; label: @tr("关闭房间"); enabled: root.room-active; clicked => { root.leave-room(); } }
+                        }
+                    }
+                    if root.network-tab == 3: VerticalLayout { spacing: 10px;
+                        Text { vertical-stretch: 0; text: @tr("粘贴 AmberL 邀请 · 需先在邀请房间页下载联机组件"); color: Theme.text; font-size: 13px; }
+                        LineEdit { height: 40px; text <=> root.invite-input; enabled: !root.room-active; accessible-label: @tr("房间邀请码"); }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { vertical-stretch: 0; text: @tr("本地端口"); color: Theme.text; vertical-alignment: center; font-size: 14px; }
+                            SpinBox { width: 140px; value <=> root.guest-port; minimum: 1024; maximum: 65535; enabled: !root.room-active; }
+                            Action { label: @tr("连接房间"); enabled: root.component-ready && !root.room-active && !root.network-busy && root.invite-input != ""; clicked => { root.join-room(); } }
+                            Action { label: @tr("离开"); enabled: root.room-active; clicked => { root.leave-room(); } }
+                        }
+                        Text { vertical-stretch: 0; text: root.room-status; color: Theme.accent; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.join-target; placeholder-text: @tr("服务器地址或房间本地地址"); accessible-label: @tr("加入游戏地址"); }
+                            Action { width: Locale.english ? 170px : 128px; label: @tr("填入房间地址"); enabled: root.room-address != ""; clicked => { root.join-target=root.room-address; } }
+                        }
+                        Text { vertical-stretch: 0; text: root.query-status; color: Theme.secondary; font-size: 13px; wrap: word-wrap; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: @tr("查询游戏状态"); enabled: root.join-target != ""; clicked => { root.probe-server(); } }
+                            Action { label: @tr("启动所选游戏并加入"); selected: true; enabled: !root.busy && root.launch-candidate && root.account-index > 0 && root.java-path != "" && root.join-target != ""; clicked => { root.launch-join(); } }
+                        }
+                        Text { vertical-stretch: 0; text: @tr("使用游戏页所选版本、账户和启动配置。请与房主保持版本和模组一致；状态响应不代表已登录或进入世界。"); color: Theme.secondary; wrap: word-wrap; font-size: 13px; }
+                    }
+                    if root.network-tab == 4: VerticalLayout { spacing: 12px;
+                        Text { vertical-stretch: 0; text: root.server-status; color: Theme.accent; font-size: 14px; wrap: word-wrap; }
+                        TextEdit { height: min(260px,root.height - 430px); text: root.server-log; read-only: true; accessible-label: @tr("服务端控制台输出"); }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.console-command; enabled: root.server-active; placeholder-text: @tr("输入单行服务端命令，例如 list"); accessible-label: @tr("服务端命令"); }
+                            Action { width: 96px; label: @tr("发送"); enabled: root.server-active && root.console-command != ""; clicked => { root.server-command(); } }
+                        }
+                    }
+                }
+                if root.panel == 6 && root.network-tab == 5: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    Text { vertical-stretch: 0; text: @tr("停止服务端后备份整个世界与组件。恢复会创建新服务端，保留原世界。"); color: Theme.secondary; wrap: word-wrap; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Action { label: @tr("备份所选服务端"); selected: true; enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.backup-server(); } }
+                        Action { label: @tr("移除所选服务端（可恢复）"); enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.archive-server(); } }
+                    }
+                    Text { vertical-stretch: 0; text: @tr("选择备份 · 恢复为新服务端"); color: Theme.text; font-size: 13px; }
+                    ComboBox { model: root.backup-options; current-index <=> root.backup-index; enabled: !root.network-busy; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        LineEdit { text <=> root.restore-name; accessible-label: @tr("恢复后的服务端名称"); enabled: !root.network-busy; }
+                        SpinBox { width: 140px; value <=> root.restore-port; minimum: 1024; maximum: 65535; enabled: !root.network-busy; }
+                        Action { width: 140px; label: @tr("校验并恢复"); enabled: !root.network-busy && root.backup-index >= 0 && root.backup-index < root.backup-options.length; clicked => { root.restore-backup(); } }
+                    }
+                    Text { vertical-stretch: 0; text: @tr("已移除的服务端 · 数据仍保留"); color: Theme.text; font-size: 13px; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: root.archived-options; current-index <=> root.archived-index; enabled: !root.network-busy; }
+                        Action { width: 140px; label: @tr("恢复到列表"); enabled: !root.network-busy && root.archived-index >= 0 && root.archived-index < root.archived-options.length; clicked => { root.restore-archived(); } }
+                    }
+                }
+                if root.panel == 9: VerticalLayout { spacing: 14px; vertical-stretch: 0;
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Action { label: @tr("当前实例"); selected: root.maintenance-tab == 0; clicked => { root.maintenance-tab=0; } }
+                        Action { label: @tr("备份与恢复"); selected: root.maintenance-tab == 1; clicked => { root.maintenance-tab=1; } }
+                    }
+                    if root.maintenance-tab == 0: VerticalLayout { spacing: 14px;
+                        Text { text: root.maintenance-has-target ? root.maintenance-target : @tr("请先选择 AmberL 创建的游戏。已有备份和移除记录可在右侧查看。"); wrap: word-wrap; color: Theme.accent; }
+                        Text { text: @tr("显示名称"); color: Theme.text; }
+                        LineEdit { height: 40px; text <=> root.maintenance-name; accessible-label: @tr("实例显示名称"); enabled: !root.busy && root.maintenance-has-target; }
+                        Text { text: @tr("图标"); color: Theme.text; }
+                        ComboBox { model: [@tr("草方块"), @tr("泥土"), @tr("铁砧"), @tr("镐")]; current-index <=> root.maintenance-icon; enabled: !root.busy && root.maintenance-has-target; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: @tr("保存名称与图标"); enabled: !root.busy && root.maintenance-has-target; clicked => { root.save-instance(); } }
+                            Action { label: @tr("创建完整备份"); enabled: !root.busy && root.maintenance-has-target; clicked => { root.backup-instance(); } }
+                        }
+                        Action { height: 40px; label: @tr("移除游戏（可恢复）"); enabled: !root.busy && root.maintenance-has-target; clicked => { root.archive-instance(); } }
+                        Text { text: @tr("移除只隐藏游戏并保留全部文件。完整备份最多 16 GiB，包含存档、配置和安装资源；请先关闭游戏。"); wrap: word-wrap; color: Theme.secondary; font-size: 13px; }
+                    }
+                    if root.maintenance-tab == 1: VerticalLayout { spacing: 12px;
+                        Text { text: @tr("完整备份"); color: Theme.text; }
+                        ComboBox { model: root.client-backups; current-index <=> root.client-backup-index; enabled: !root.busy; }
+                        LineEdit { height: 40px; text <=> root.client-restore-parent; placeholder-text: @tr("恢复父目录（已存在的独立目录）"); accessible-label: @tr("游戏恢复父目录"); enabled: !root.busy; }
+                        LineEdit { height: 40px; text <=> root.client-restore-name; placeholder-text: @tr("新的文件夹名称"); accessible-label: @tr("游戏恢复文件夹名称"); enabled: !root.busy; }
+                        Action { height: 40px; label: @tr("校验并恢复为新游戏"); enabled: !root.busy && root.client-backups.length > 0 && root.client-backup-index >= 0 && root.client-restore-parent != "" && root.client-restore-name != ""; clicked => { root.restore-instance(); } }
+                        Text { text: @tr("已移除的游戏"); color: Theme.text; }
+                        ComboBox { model: root.archived-games; current-index <=> root.archived-game-index; enabled: !root.busy; }
+                        Action { height: 40px; label: @tr("恢复显示"); enabled: !root.busy && root.archived-games.length > 0 && root.archived-game-index >= 0; clicked => { root.unarchive-instance(); } }
+                        Text { text: @tr("恢复会创建独立副本，不覆盖原游戏。损坏或同名冲突会停止恢复并保留现场。"); wrap: word-wrap; color: Theme.secondary; font-size: 13px; }
+                    }
+                }
+                if root.panel == 8: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    Text { vertical-stretch: 0; text: root.content-target; color: Theme.accent; overflow: elide; font-size: 14px; }
+                    HorizontalLayout { height: 36px; spacing: 12px;
+                        Action { label: @tr("查找内容"); selected: root.content-tab == 0; clicked => { root.content-tab=0; } }
+                        Action { label: @tr("已安装与恢复"); selected: root.content-tab == 1; clicked => { root.content-tab=1; } }
+                    }
+                    if root.content-tab == 0 && root.content-step == 0: VerticalLayout { spacing: 10px;
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { width: 124px; model: [@tr("模组"), @tr("资源包"), @tr("光影"), @tr("插件")]; current-index <=> root.content-kind-index; enabled: !root.busy; selected(value) => { root.search-content(); } }
+                            LineEdit { text <=> root.content-query; placeholder-text: @tr("搜索 Modrinth"); accessible-label: @tr("搜索内容"); enabled: !root.busy; }
+                            Action { width: 80px; label: @tr("搜索"); enabled: !root.busy; clicked => { root.search-content(); } }
+                        }
+                        HorizontalLayout { height: 28px; spacing: 16px;
+                            CheckBox { text: @tr("匹配游戏版本"); checked <=> root.content-match-game; enabled: !root.busy; toggled => { root.search-content(); } }
+                            CheckBox { text: @tr("匹配加载器"); checked <=> root.content-match-loader; enabled: !root.busy; toggled => { root.search-content(); } }
+                            Text { text: @tr("安装前仍会核对兼容性"); color: Theme.secondary; font-size: 13px; vertical-alignment: center; }
+                        }
+                        ScrollView { height: min(168px,root.height - 618px);
+                            VerticalLayout { spacing: 6px;
+                                for project[index] in root.content-projects: Action { height: 38px; label: project; selected: root.content-project-index == index; enabled: !root.busy; clicked => { root.content-project-index=index; root.content-project(); } }
+                            }
+                        }
+                        ComboBox { model: root.content-versions; current-index <=> root.content-version-index; enabled: !root.busy; }
+                        Action { height: 40px; label: @tr("预览版本与依赖"); selected: true; enabled: !root.busy && root.content-version-index >= 0 && root.content-version-index < root.content-versions.length; clicked => { root.preview-content(); } }
+                    }
+                    if root.content-tab == 0 && root.content-step == 1: VerticalLayout { spacing: 12px;
+                        TextEdit { height: min(200px,root.height - 510px); text: root.content-preview; read-only: true; accessible-label: @tr("内容安装清单"); }
+                        if root.content-optional.length > 0: ScrollView { height: 64px;
+                            VerticalLayout { spacing: 6px;
+                                for option[index] in root.content-optional: CheckBox { text: option.title; checked: option.selected; enabled: !root.busy; toggled => { root.select-optional(index, self.checked); } }
+                            }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: @tr("返回选择"); enabled: !root.busy; clicked => { root.content-step=0; } }
+                            Action { label: @tr("安装此清单"); selected: true; enabled: !root.busy && root.content-has-plan; clicked => { root.install-content(); } }
+                        }
+                    }
+                    if root.content-tab == 1: VerticalLayout { spacing: 12px;
+                        ComboBox { model: root.content-groups; current-index <=> root.content-group-index; enabled: !root.busy; }
+                        Text { vertical-stretch: 0; text: @tr("按安装组管理；共享依赖会保留。被手动修改的文件会停止操作并保留。恢复不会覆盖其他文件。"); wrap: word-wrap; color: Theme.secondary; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: @tr("继续未完成安装"); enabled: !root.busy && root.content-group-index >= 0 && root.content-group-states[root.content-group-index] == "pending"; clicked => { root.change-content("resume"); } }
+                            Action { label: @tr("移除（可恢复）"); enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "installed" || root.content-group-states[root.content-group-index] == "pending" || root.content-group-states[root.content-group-index] == "removing"); clicked => { root.change-content("remove"); } }
+                            Action { label: @tr("恢复安装组"); enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "removed" || root.content-group-states[root.content-group-index] == "restoring"); clicked => { root.change-content("restore"); } }
+                        }
+                    }
+                }
+                if root.panel == 7: VerticalLayout {
+                    Text { vertical-stretch: 0; text: @tr("AmberL · 原生桌面开发预览\nAmbrum Rust 核心 / MPL-2.0\n沿用 AMBER 图形标志，青绿色为 AmberL 识别色。\nSlint 为当前界面实现，最终框架验收尚未完成。"); color: Theme.secondary; wrap: word-wrap; }
+                    AboutSlint {}
+                }
+                if root.panel == 10: VerticalLayout { spacing: 16px; vertical-stretch: 0;
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Action { label: "简体中文"; selected: !Locale.english; clicked => { root.language(false); } }
+                        Action { label: "English"; selected: Locale.english; clicked => { root.language(true); } }
+                    }
+                    Text { text: @tr("外观"); color: Theme.text; }
+                    HorizontalLayout { height: 44px; spacing: 12px;
+                        Action { label: @tr("深色玻璃"); selected: !Theme.light; clicked => { root.appearance(false); } }
+                        Action { label: @tr("浅色玻璃"); selected: Theme.light; clicked => { root.appearance(true); } }
+                    }
+                    Text { text: @tr("外观会保存在 AmberL 中，下次打开自动恢复。账户和每个游戏的启动配置独立保存。"); color: Theme.secondary; wrap: word-wrap; }
+                    Action { height: 44px; label: @tr("打开当前游戏配置"); clicked => { root.panel=2; } }
+                }
+                if root.panel != 11: Rectangle { vertical-stretch: 1; }
+                HorizontalLayout { height: 44px; spacing: 12px;
+                    Text { text: root.panel == 6 && !root.busy ? root.network-status : root.status; color: Theme.secondary; wrap: word-wrap; overflow: elide; vertical-alignment: center; }
+                    if root.busy: Action { width: Locale.english ? 220px : 176px; height: 44px; label: root.running ? @tr("请求游戏正常退出") : @tr("取消当前操作"); clicked => { root.cancel(); } }
+                }
+            }
+        }
+    }
+    HorizontalLayout { x: root.width - 148px; y: 32px; width: 112px; height: 40px; spacing: 2px;
+        Action { min-width: 34px; height: 40px; label: "−"; accessible-label: @tr("最小化"); flat: true; on-scene: root.panel != 0; clicked => { root.minimize(); } }
+        Action { min-width: 34px; height: 40px; label: "□"; accessible-label: @tr("最大化或还原"); flat: true; on-scene: root.panel != 0; clicked => { root.maximize(); } }
+        Action { min-width: 34px; height: 40px; label: "×"; accessible-label: @tr("关闭窗口"); flat: true; on-scene: root.panel != 0; clicked => { root.close(); } }
+    }
+
+}

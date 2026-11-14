@@ -1,0 +1,21 @@
+[package]
+name = "amberl-probe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ambrum = { path = "../../crates/ambrum" }
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[[bin]]
+name = "amberl-inspect"
+path = "src/cli.rs"
+
+[[bin]]
+name = "amberl-native-probe"
+path = "src/main.rs"
