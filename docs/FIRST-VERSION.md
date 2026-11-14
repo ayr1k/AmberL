@@ -11,7 +11,7 @@ is not user acceptance or authorization to merge/publish. Baseline: `452c161`.
 | Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices and broader GUI acceptance |
 | Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection; Java 8 old server and Java 25 Forge worlds | Additional runtime variants and game/UI acceptance |
 | Libraries and data | Multi-library read-only registration, new isolated installs; owned-instance naming/icons, full snapshots/new-copy restore and recoverable removal | Shared/unknown capability rules and broader imported-library support |
-| Desktop | Frameless glass, version list, saved per-game choices | Final framework comparison decision, Chinese/English, light/dark, keyboard/IME/Narrator/DPI |
+| Desktop | Frameless glass, version list, saved per-game choices, persistent light/dark appearance | Final framework comparison decision, Chinese/English, full keyboard/IME/Narrator/DPI acceptance |
 | Delivery | Exact-source ZIP, checksums/notices, Draft PR and CI; per-user installer with actual install/upgrade/launch/uninstall/data-retention verification | Update channel, clean-machine startup, release documentation |
 | Product acceptance | Disposable local fixtures and user feedback | Same-condition AMBER comparison, two-device and user task acceptance |
 

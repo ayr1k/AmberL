@@ -77,6 +77,20 @@ pub fn save(app: &Path, id: &str, preference: Launch) -> Result<()> {
     doc.save()
 }
 
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Appearance {
+    pub light: bool,
+}
+pub fn appearance(app: &Path) -> Result<Appearance> {
+    Ok(Document::<Appearance>::open(app, "appearance-v1.json")?.data)
+}
+pub fn save_appearance(app: &Path, appearance: Appearance) -> Result<()> {
+    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
+    doc.data = appearance;
+    doc.save()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

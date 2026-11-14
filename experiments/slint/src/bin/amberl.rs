@@ -784,6 +784,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .on_tile(move |x, y, w, h, vw, vh| glass.borrow_mut().tile([x, y, w, h, vw, vh]));
     ui.global::<GlassAssets>().set_ready(true);
     let model = Rc::new(RefCell::new(Model::new(app)));
+    match model.borrow().appearance() {
+        Ok(saved) => ui.invoke_apply_appearance(saved.light),
+        Err(error) => eprintln!("Appearance preserved: {error}"),
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_appearance(move |light| {
+            let result = model.borrow_mut().save_appearance(light);
+            match result {
+                Ok(()) => {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.invoke_apply_appearance(light);
+                    }
+                }
+                Err(error) => model.borrow_mut().report(error),
+            }
+        });
+    }
     content_bindings(&ui, &model);
     maintenance_bindings(&ui, &model);
     let view = Rc::new(RefCell::new(View::default()));

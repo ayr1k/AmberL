@@ -43,8 +43,9 @@ process, service or per-frame CPU convolution is used. System fonts are not bund
 Stage B remains a preview. Slint carries the chosen visual implementation while
 IME composition, Narrator/high contrast, multi-monitor DPI transitions and clean-machine
 deployment remain acceptance gates. Read-only library parsing is broader than launch
-compatibility. Complete multiplayer acceptance, runtime downloading,
-installer/updater delivery and a force-exit policy remain future work. Process creation
+compatibility. Complete multiplayer acceptance, a production updater and a force-exit
+policy remain future work. Managed runtimes and a per-user test installer are available;
+see CONTENT.md and INSTALLER.md. Process creation
 does not establish world readiness. A windowless/unresponsive game can keep cancellation
 waiting; there is no bulk Java termination. No stable release or merge is authorized.
 
@@ -79,4 +80,17 @@ budget is checked before final commit, not a hard disk quota on a running instal
 Fabric API、QSL、OptiFine、整合包、已有实例的组件修改不包含在这次安装向导中。
 版本列表表示官方目录中可选的组合，不代表每一个历史版本都经过实际游戏验收。
 External game libraries remain read-only. Existing installations are not upgraded
-or renamed in place; custom naming/icons apply at creation in this iteration.
+in place. Owned-instance display names/icons can now be edited independently from
+immutable version metadata; see INSTANCE-RECOVERY.md for removal and backup restoration.
+
+## Appearance / 外观
+
+The top-level **设置** opens app settings; the bottom **配置** opens the selected game's
+launch settings. Choose **深色玻璃 / 浅色玻璃** to switch immediately. AmberL remembers
+the choice in its own `appearance-v1.json`; system and other Amber product settings
+are unchanged. Both retain the scenery, teal identity and aligned glass panels.
+Light mode uses dark text, themed native inputs and visible keyboard focus.
+
+顶部 **设置** 管理应用外观，底部 **配置** 管理当前游戏。浅色与深色玻璃即时切换，
+下次启动恢复上次选择。版本列表已实际验证 Tab 导航和回车选择；这不等于完整的
+读屏、中文输入法预编辑或跨屏 DPI 验收。

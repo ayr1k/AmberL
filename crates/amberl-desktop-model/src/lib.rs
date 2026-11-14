@@ -135,6 +135,12 @@ pub struct Model {
     log: VecDeque<String>,
 }
 impl Model {
+    pub fn appearance(&self) -> Result<ambrum::preferences::Appearance> {
+        ambrum::preferences::appearance(&self.app)
+    }
+    pub fn save_appearance(&mut self, light: bool) -> Result<()> {
+        ambrum::preferences::save_appearance(&self.app, ambrum::preferences::Appearance { light })
+    }
     pub fn new(app: PathBuf) -> Self {
         let saved = ambrum::preferences::load(&app);
         let (selected, preferences) = saved.as_ref().cloned().unwrap_or_default();
