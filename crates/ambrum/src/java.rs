@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 use crate::{Result, paths, task::Cancellation};
 use serde::Serialize;
+#[cfg(windows)]
+pub mod runtime;
 use std::{
     io::Read,
     path::Path,

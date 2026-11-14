@@ -7,7 +7,10 @@ use ambrum::{
 };
 use std::{collections::VecDeque, path::PathBuf, sync::mpsc, thread};
 enum Message {
+    Configuration(server::config::Snapshot),
+    Loaders(String, String, Vec<String>),
     Servers(Vec<server::Server>),
+    Recovery(Vec<server::backup::Backup>, Vec<server::Server>),
     Server(server::Event),
     RoomStarted(String),
     Probe(String, Result<multiplayer::Status>),
@@ -51,6 +54,12 @@ pub struct Network {
     pub join_address: String,
     pub component: bool,
     pub revision: u64,
+    pub loader_key: (String, String),
+    pub loaders: Vec<String>,
+    pub backups: Vec<server::backup::Backup>,
+    pub archived: Vec<server::Server>,
+    pub configuration: Option<server::config::Snapshot>,
+    pub configuration_revision: u64,
     maintenance: Option<Worker>,
     server: Option<Worker>,
     room: Option<Worker>,
@@ -73,6 +82,12 @@ impl Network {
             join_address: String::new(),
             component,
             revision: 1,
+            loader_key: (String::new(), String::new()),
+            loaders: vec![],
+            backups: vec![],
+            archived: vec![],
+            configuration: None,
+            configuration_revision: 0,
             maintenance: None,
             server: None,
             room: None,
@@ -116,13 +131,103 @@ impl Network {
         self.maintenance(|app, _, tx| {
             tx.send(Message::Servers(server::list(&app)?))
                 .map_err(|_| "Window closed")?;
+            tx.send(Message::Recovery(
+                server::backup::list(&app)?,
+                server::archived(&app)?,
+            ))
+            .map_err(|_| "Window closed")?;
             Ok(())
         })
     }
-    pub fn create(&mut self, name: String, version: String, port: i32, eula: bool) -> Result<()> {
-        let port = u16::try_from(port).map_err(|_| "无效服务端端口")?;
+    pub fn load_configuration(&mut self, recover: bool) -> Result<()> {
+        let id = self.selected.clone().ok_or("请选择服务端")?;
+        self.maintenance(move |app, _, tx| {
+            if recover {
+                server::config::recover(&app, &id)?;
+            }
+            tx.send(Message::Configuration(server::config::read(&app, &id)?))
+                .map_err(|_| "Window closed")?;
+            Ok(())
+        })?;
+        self.configuration = None;
+        Ok(())
+    }
+    pub fn save_configuration(&mut self, settings: server::config::Settings) -> Result<()> {
+        let expected = self.configuration.clone().ok_or("请先读取配置")?;
+        if Some(&expected.server) != self.selected.as_ref() {
+            return Err("服务端已变化，请重新读取配置".into());
+        }
+        self.maintenance(move |app, _, tx| {
+            tx.send(Message::Configuration(server::config::save(
+                &app, &expected, &settings,
+            )?))
+            .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn backup(&mut self) -> Result<()> {
+        let id = self.selected.clone().ok_or("请选择服务端")?;
+        if self.server_active() {
+            return Err("请先保存并停止服务端，再备份".into());
+        }
         self.maintenance(move |app, c, tx| {
-            server::create(&app, &name, &version, port, eula, &c)?;
+            server::backup::create(&app, &id, &c)?;
+            tx.send(Message::Recovery(
+                server::backup::list(&app)?,
+                server::archived(&app)?,
+            ))
+            .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn restore_backup(&mut self, index: i32, name: String, port: i32) -> Result<()> {
+        let id = self
+            .backups
+            .get(usize::try_from(index).map_err(|_| "请选择备份")?)
+            .ok_or("请选择备份")?
+            .id
+            .clone();
+        let port = u16::try_from(port).map_err(|_| "无效端口")?;
+        self.maintenance(move |app, c, tx| {
+            server::backup::restore(&app, &id, &name, port, &c)?;
+            tx.send(Message::Servers(server::list(&app)?))
+                .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn archive(&mut self, undo: Option<i32>) -> Result<()> {
+        let id = if let Some(index) = undo {
+            self.archived
+                .get(usize::try_from(index).map_err(|_| "请选择移除的服务端")?)
+                .ok_or("请选择移除的服务端")?
+                .id
+                .clone()
+        } else {
+            self.selected.clone().ok_or("请选择服务端")?
+        };
+        self.maintenance(move |app, _, tx| {
+            server::set_archived(&app, &id, undo.is_none())?;
+            tx.send(Message::Servers(server::list(&app)?))
+                .map_err(|_| "Window closed")?;
+            tx.send(Message::Recovery(
+                server::backup::list(&app)?,
+                server::archived(&app)?,
+            ))
+            .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn load_loaders(&mut self, game: String, kind: String) -> Result<()> {
+        self.maintenance(move |_, c, tx| {
+            let rows = ambrum::loader::versions(&game, &kind, &ambrum::download::Https, &c)?;
+            tx.send(Message::Loaders(game, kind, rows))
+                .map_err(|_| "Window closed")?;
+            Ok(())
+        })
+    }
+    pub fn create(&mut self, request: server::Create) -> Result<()> {
+        self.maintenance(move |app, c, tx| {
+            server::create_with_loader(&app, &request, &c)?;
             tx.send(Message::Servers(server::list(&app)?))
                 .map_err(|_| "Window closed")?;
             Ok(())
@@ -291,6 +396,18 @@ impl Network {
             }
             for message in messages {
                 match message {
+                    Message::Configuration(snapshot) => {
+                        self.configuration = Some(snapshot);
+                        self.configuration_revision += 1;
+                    }
+                    Message::Recovery(backups, archived) => {
+                        self.backups = backups;
+                        self.archived = archived;
+                    }
+                    Message::Loaders(game, kind, rows) => {
+                        self.loader_key = (game, kind);
+                        self.loaders = rows;
+                    }
                     Message::Servers(rows) => {
                         self.servers = rows;
                         if !self

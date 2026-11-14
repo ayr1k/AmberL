@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
-import { Button, LineEdit, ComboBox, SpinBox, ListView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
+import { Button, LineEdit, ComboBox, SpinBox, ListView, ScrollView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
 
 
 export struct GameRow { id: string, title: string, subtitle: string, icon: string }
 export struct VersionRow { id: string, kind: string }
+export struct OptionalRow { title: string, selected: bool }
 export global GlassAssets {
     in-out property <bool> ready: false;
     pure callback tile(float, float, float, float, float, float) -> image;
@@ -99,11 +100,16 @@ export component Launcher inherits Window {
     in-out property <int> panel: 0;
     callback select-game(string); callback refresh(); callback add-library(); callback install-game();
     callback login(); callback logout(); callback open-microsoft(); callback discover-java();
+    in-out property <int> java-download-index: 4;
+    callback install-java();
     callback choose-account(int); callback choose-java(int); callback launch(); callback cancel(); callback open-folder();
     callback save-config(); callback open-eula(); callback launch-join();
     in-out property <int> network-tab: 0;
     in property <[string]> server-options; in-out property <int> server-index: -1;
     in property <[string]> server-versions; in-out property <int> server-version-index: -1;
+    in-out property <string> server-loader-kind: "原版";
+    in property <[string]> server-loader-options; in-out property <int> server-loader-index: -1;
+    callback load-server-loaders();
     in property <bool> network-busy; in property <bool> server-active; in property <bool> room-active; in property <bool> component-ready;
     in property <string> network-status; in property <string> server-status; in property <string> room-status; in property <string> query-status;
     in property <string> server-log; in property <string> room-invite; in property <string> room-address;
@@ -114,6 +120,26 @@ export component Launcher inherits Window {
     in-out property <string> invite-input; in-out property <string> join-target;
     callback refresh-servers(); callback create-server(); callback choose-server(int); callback start-server(); callback stop-server(); callback server-command();
     callback install-network(); callback host-room(); callback join-room(); callback leave-room(); callback probe-server();
+    in property <[string]> backup-options; in-out property <int> backup-index: -1;
+    in property <[string]> archived-options; in-out property <int> archived-index: -1;
+    in-out property <string> restore-name: "恢复的世界"; in-out property <int> restore-port: 25568;
+    callback backup-server(); callback restore-backup(); callback archive-server(); callback restore-archived();
+    callback load-server-config(); callback save-server-config(); callback recover-server-config();
+    in property <bool> server-config-ready: false;
+    in-out property <string> server-motd;
+    in-out property <int> server-players: 8;
+    in-out property <int> server-distance: 8;
+    in-out property <string> server-difficulty: "easy";
+    in-out property <string> server-mode: "survival";
+    in property <string> content-target; in property <string> content-preview;
+    in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
+    in property <[string]> content-group-states;
+    in property <[OptionalRow]> content-optional;
+    callback select-optional(int, bool);
+    in-out property <int> content-project-index: -1; in-out property <int> content-version-index: -1; in-out property <int> content-group-index: -1;
+    in-out property <int> content-kind-index: 0; in-out property <int> content-step: 0; in-out property <int> content-tab: 0;
+    in-out property <string> content-query; in property <bool> content-has-plan;
+    callback open-content(bool); callback search-content(); callback content-project(); callback preview-content(); callback install-content(); callback change-content(string);
 
     // Explicit origins prevent Slint's automatic child centering from shifting the scene.
     Image { x: 0px; y: 0px; width: root.width; height: root.height; source: @image-url("../../../assets/launcher/forest-lake.png"); image-fit: cover; }
@@ -180,12 +206,12 @@ export component Launcher inherits Window {
     if root.panel != 0: Rectangle {
         x: 0px; y: 0px; width: root.width; height: root.height; background: #07151b64;
         TouchArea { }
-        Glass { x: (parent.width - self.width)/2; y: root.panel == 6 ? max(80px,(parent.height - self.height)/2) : (parent.height - self.height)/2; width: min(root.panel == 6 ? 900px : 720px,parent.width - 80px);
-            height: min(root.panel == 6 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 ? 140px : 100px));
+        Glass { x: (parent.width - self.width)/2; y: root.panel == 6 || root.panel == 8 ? max(80px,(parent.height - self.height)/2) : (parent.height - self.height)/2; width: min(root.panel == 6 || root.panel == 8 ? 900px : 720px,parent.width - 80px);
+            height: min(root.panel == 6 || root.panel == 8 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 || root.panel == 8 ? 140px : 100px));
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: #10232dde;
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
-                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
+                    Text { vertical-stretch: 0; vertical-alignment: center; text: root.panel == 1 ? "微软账户" : root.panel == 2 ? "启动配置" : root.panel == 3 ? "添加游戏库" : root.panel == 4 ? "安装游戏" : root.panel == 5 ? "当前任务" : root.panel == 6 ? "联机" : root.panel == 8 ? "内容管理" : "关于 AmberL"; color: #f2f5f1; font-size: 28px; font-weight: 600; }
                     Action { width: 100px; label: "返回游戏"; clicked => { root.panel=0; } }
                 }
                 if root.panel == 1: VerticalLayout {
@@ -203,15 +229,24 @@ export component Launcher inherits Window {
                     Text { vertical-stretch: 0; text: "退出只移除本机登录信息，不退出已经运行的游戏。"; color: #aab8ba; wrap: word-wrap; }
                 }
                 if root.panel == 2: VerticalLayout {
-                    spacing: 14px;
+                    spacing: 12px;
                     Text { vertical-stretch: 0; text: "为当前游戏保存 Java、账户选择和内存，重新打开后恢复。"; color: #becacb; wrap: word-wrap; }
-                    Button { text: "查找本机 Java"; enabled: !root.busy; clicked => { root.discover-java(); } }
-                    ComboBox { model: root.java-options; current-index <=> root.java-index; enabled: !root.busy; selected(value) => { root.choose-java(self.current-index); } }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: root.java-options; current-index <=> root.java-index; enabled: !root.busy; selected(value) => { root.choose-java(self.current-index); } }
+                        Button { width: 140px; text: "查找本机 Java"; enabled: !root.busy; clicked => { root.discover-java(); } }
+                    }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: ["Java 8", "Java 16", "Java 17", "Java 21", "Java 25"]; current-index <=> root.java-download-index; enabled: !root.busy; }
+                        Button { text: "下载官方 Java"; enabled: !root.busy; clicked => { root.install-java(); } }
+                    }
                     Text { vertical-stretch: 0; text: "Java 可执行文件（java.exe）"; color: #d9e2e0; }
                     LineEdit { height: 40px; text <=> root.java-path; enabled: !root.busy; accessible-label: "Java 可执行文件"; }
                     HorizontalLayout { spacing: 16px; height: 40px; Text { vertical-stretch: 0; vertical-alignment: center; text: "最大内存（MiB）"; color: #d9e2e0; } SpinBox { value <=> root.memory-mib; minimum: 512; maximum: 65536; enabled: !root.busy; } }
-                    Button { text: "打开所选游戏目录"; enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
-                    Button { text: "保存当前游戏配置"; enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Button { text: "打开游戏目录"; enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
+                        Button { text: "模组与资源"; enabled: !root.busy && root.launch-candidate; clicked => { root.open-content(false); } }
+                        Button { text: "保存启动配置"; enabled: !root.busy && root.selected-id != ""; clicked => { root.save-config(); } }
+                    }
                     Text { vertical-stretch: 0; text: "只启动 AmberL 创建的完整安装。启动前重新校验文件、账户与 Java；外部游戏库保持只读。"; color: #aab8ba; wrap: word-wrap; }
                 }
                 if root.panel == 3: VerticalLayout {
@@ -310,6 +345,7 @@ export component Launcher inherits Window {
                         Action { label: "邀请房间"; selected: root.network-tab == 2; clicked => { root.network-tab=2; } }
                         Action { label: "加入游戏"; selected: root.network-tab == 3; clicked => { root.network-tab=3; } }
                         Action { label: "控制台"; selected: root.network-tab == 4; clicked => { root.network-tab=4; } }
+                        Action { label: "备份恢复"; selected: root.network-tab == 5; clicked => { root.network-tab=5; root.refresh-servers(); } }
                     }
                     if root.network-tab == 0: VerticalLayout { spacing: 16px;
                         Text { vertical-stretch: 0; text: "我的独立服务端"; color: #d9e2e0; font-size: 14px; }
@@ -328,13 +364,45 @@ export component Launcher inherits Window {
                             Action { label: "启动服务端"; selected: true; enabled: !root.network-busy && !root.server-active && root.server-index >= 0 && root.java-path != ""; clicked => { root.start-server(); } }
                             Action { label: "保存并停止"; enabled: root.server-active; clicked => { root.stop-server(); } }
                         }
-                        Text { vertical-stretch: 0; text: "服务端与游戏可同时运行。当前创建原版服务端，只监听本机，启用正版验证；使用邀请房间与朋友连接。"; color: #becacb; wrap: word-wrap; font-size: 14px; }
+                        Text { vertical-stretch: 0; text: "服务端与游戏可同时运行。只监听本机，启用正版验证；使用邀请房间与朋友连接。"; color: #becacb; wrap: word-wrap; font-size: 14px; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: "管理服务端模组"; enabled: !root.busy && !root.server-active && root.server-index >= 0; clicked => { root.open-content(true); } }
+                            Action { label: "服务端配置"; enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.network-tab=6; root.load-server-config(); } }
+                        }
+                    }
+                    if root.network-tab == 6: VerticalLayout { spacing: 12px;
+                        Text { text: "服务端配置 · 停服后保存"; color: #d9e2e0; vertical-stretch: 0; }
+                        Text { text: "服务器描述"; color: #becacb; vertical-stretch: 0; }
+                        LineEdit { text <=> root.server-motd; accessible-label: "服务器描述"; enabled: root.server-config-ready && !root.network-busy; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: "人数上限"; color: #becacb; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-players; minimum: 1; maximum: 1000; enabled: root.server-config-ready && !root.network-busy; }
+                            Text { text: "视距"; color: #becacb; vertical-alignment: center; }
+                            SpinBox { value <=> root.server-distance; minimum: 2; maximum: 32; enabled: root.server-config-ready && !root.network-busy; }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Text { text: "难度"; color: #becacb; vertical-alignment: center; }
+                            ComboBox { model: ["peaceful", "easy", "normal", "hard"]; current-value <=> root.server-difficulty; enabled: root.server-config-ready && !root.network-busy; }
+                            Text { text: "模式"; color: #becacb; vertical-alignment: center; }
+                            ComboBox { model: ["survival", "creative", "adventure", "spectator"]; current-value <=> root.server-mode; enabled: root.server-config-ready && !root.network-busy; }
+                        }
+                        Text { text: "保存时检查外部修改，并保留恢复副本。若写入中断，先恢复配置再启动。"; color: #becacb; wrap: word-wrap; vertical-stretch: 0; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: "重新读取"; enabled: !root.network-busy; clicked => { root.load-server-config(); } }
+                            Action { label: "保存配置"; selected: true; enabled: root.server-config-ready && !root.network-busy; clicked => { root.save-server-config(); } }
+                            Action { label: "恢复中断写入"; enabled: !root.network-busy; clicked => { root.recover-server-config(); } }
+                        }
                     }
                     if root.network-tab == 1: VerticalLayout { spacing: 12px;
-                        Text { vertical-stretch: 0; text: "游戏版本 · 官方原版服务端"; color: #d9e2e0; font-size: 13px; }
+                        Text { vertical-stretch: 0; text: "游戏版本与加载器"; color: #d9e2e0; font-size: 13px; }
                         HorizontalLayout { height: 40px; spacing: 12px;
                             ComboBox { model: root.server-versions; current-index <=> root.server-version-index; enabled: !root.network-busy; }
                             Action { width: 96px; label: "更新列表"; enabled: !root.busy; clicked => { root.load-versions(); } }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { width: 160px; model: ["原版", "Fabric", "Quilt", "Forge", "NeoForge"]; current-value <=> root.server-loader-kind; enabled: !root.network-busy; }
+                            ComboBox { model: root.server-loader-options; current-index <=> root.server-loader-index; enabled: !root.network-busy && root.server-loader-kind != "原版"; }
+                            Action { width: 96px; label: "加载器列表"; enabled: !root.network-busy && root.server-version-index >= 0 && root.server-loader-kind != "原版"; clicked => { root.load-server-loaders(); } }
                         }
                         Text { vertical-stretch: 0; text: "名称与监听端口"; color: #d9e2e0; font-size: 13px; }
                         HorizontalLayout { height: 40px; spacing: 12px;
@@ -394,6 +462,67 @@ export component Launcher inherits Window {
                         HorizontalLayout { height: 40px; spacing: 12px;
                             LineEdit { text <=> root.console-command; enabled: root.server-active; placeholder-text: "输入单行服务端命令，例如 list"; accessible-label: "服务端命令"; }
                             Action { width: 96px; label: "发送"; enabled: root.server-active && root.console-command != ""; clicked => { root.server-command(); } }
+                        }
+                    }
+                }
+                if root.panel == 6 && root.network-tab == 5: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    Text { vertical-stretch: 0; text: "停止服务端后备份整个世界与组件。恢复会创建新服务端，保留原世界。"; color: #becacb; wrap: word-wrap; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        Action { label: "备份所选服务端"; selected: true; enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.backup-server(); } }
+                        Action { label: "移除所选服务端（可恢复）"; enabled: !root.network-busy && !root.server-active && root.server-index >= 0; clicked => { root.archive-server(); } }
+                    }
+                    Text { vertical-stretch: 0; text: "选择备份 · 恢复为新服务端"; color: #d9e2e0; font-size: 13px; }
+                    ComboBox { model: root.backup-options; current-index <=> root.backup-index; enabled: !root.network-busy; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        LineEdit { text <=> root.restore-name; accessible-label: "恢复后的服务端名称"; enabled: !root.network-busy; }
+                        SpinBox { width: 140px; value <=> root.restore-port; minimum: 1024; maximum: 65535; enabled: !root.network-busy; }
+                        Action { width: 140px; label: "校验并恢复"; enabled: !root.network-busy && root.backup-index >= 0 && root.backup-index < root.backup-options.length; clicked => { root.restore-backup(); } }
+                    }
+                    Text { vertical-stretch: 0; text: "已移除的服务端 · 数据仍保留"; color: #d9e2e0; font-size: 13px; }
+                    HorizontalLayout { height: 40px; spacing: 12px;
+                        ComboBox { model: root.archived-options; current-index <=> root.archived-index; enabled: !root.network-busy; }
+                        Action { width: 140px; label: "恢复到列表"; enabled: !root.network-busy && root.archived-index >= 0 && root.archived-index < root.archived-options.length; clicked => { root.restore-archived(); } }
+                    }
+                }
+                if root.panel == 8: VerticalLayout { spacing: 12px; vertical-stretch: 0;
+                    Text { vertical-stretch: 0; text: root.content-target; color: #9ae3cc; overflow: elide; font-size: 14px; }
+                    HorizontalLayout { height: 36px; spacing: 12px;
+                        Action { label: "查找内容"; selected: root.content-tab == 0; clicked => { root.content-tab=0; } }
+                        Action { label: "已安装与恢复"; selected: root.content-tab == 1; clicked => { root.content-tab=1; } }
+                    }
+                    if root.content-tab == 0 && root.content-step == 0: VerticalLayout { spacing: 10px;
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            ComboBox { width: 124px; model: ["模组", "资源包", "光影"]; current-index <=> root.content-kind-index; enabled: !root.busy; selected(value) => { root.search-content(); } }
+                            LineEdit { text <=> root.content-query; placeholder-text: "搜索 Modrinth"; accessible-label: "搜索内容"; enabled: !root.busy; }
+                            Action { width: 80px; label: "搜索"; enabled: !root.busy; clicked => { root.search-content(); } }
+                        }
+                        ScrollView { height: min(168px,root.height - 580px);
+                            VerticalLayout { spacing: 6px;
+                                for project[index] in root.content-projects: Action { height: 38px; label: project; selected: root.content-project-index == index; enabled: !root.busy; clicked => { root.content-project-index=index; root.content-project(); } }
+                            }
+                        }
+                        ComboBox { model: root.content-versions; current-index <=> root.content-version-index; enabled: !root.busy; }
+                        Action { height: 40px; label: "预览版本与依赖"; selected: true; enabled: !root.busy && root.content-version-index >= 0 && root.content-version-index < root.content-versions.length; clicked => { root.preview-content(); } }
+                    }
+                    if root.content-tab == 0 && root.content-step == 1: VerticalLayout { spacing: 12px;
+                        TextEdit { height: min(200px,root.height - 510px); text: root.content-preview; read-only: true; accessible-label: "内容安装清单"; }
+                        if root.content-optional.length > 0: ScrollView { height: 64px;
+                            VerticalLayout { spacing: 6px;
+                                for option[index] in root.content-optional: CheckBox { text: option.title; checked: option.selected; enabled: !root.busy; toggled => { root.select-optional(index, self.checked); } }
+                            }
+                        }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: "返回选择"; enabled: !root.busy; clicked => { root.content-step=0; } }
+                            Action { label: "安装此清单"; selected: true; enabled: !root.busy && root.content-has-plan; clicked => { root.install-content(); } }
+                        }
+                    }
+                    if root.content-tab == 1: VerticalLayout { spacing: 12px;
+                        ComboBox { model: root.content-groups; current-index <=> root.content-group-index; enabled: !root.busy; }
+                        Text { vertical-stretch: 0; text: "按安装组管理；共享依赖会保留。被手动修改的文件会停止操作并保留。恢复不会覆盖其他文件。"; wrap: word-wrap; color: #becacb; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { label: "继续未完成安装"; enabled: !root.busy && root.content-group-index >= 0 && root.content-group-states[root.content-group-index] == "pending"; clicked => { root.change-content("resume"); } }
+                            Action { label: "移除（可恢复）"; enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "installed" || root.content-group-states[root.content-group-index] == "pending" || root.content-group-states[root.content-group-index] == "removing"); clicked => { root.change-content("remove"); } }
+                            Action { label: "恢复安装组"; enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "removed" || root.content-group-states[root.content-group-index] == "restoring"); clicked => { root.change-content("restore"); } }
                         }
                     }
                 }

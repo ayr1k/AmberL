@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! App-owned Vanilla servers, official bytes and graceful stdin stop. No imported saves.
+//! App-owned servers, verified runtime bytes and graceful stdin stop. No imported saves.
 use crate::{
     Result, catalog,
     download::{Algorithm, Artifact, Cache, Https, windows::Hash},
@@ -21,6 +21,8 @@ use std::{
     time::Duration,
 };
 use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+pub mod backup;
+pub mod config;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +31,10 @@ pub struct Server {
     pub name: String,
     pub version: String,
     pub port: u16,
+    #[serde(default)]
+    pub loader: Option<crate::loader::server::Runtime>,
+    #[serde(default)]
+    pub archived: bool,
     object: ObjectId,
 }
 #[derive(Serialize, Deserialize)]
@@ -55,6 +61,9 @@ fn validate(data: &Data) -> Result<()> {
             return Err("Invalid server identity".into());
         }
         details(&s.name, &s.version, s.port)?;
+        if let Some(loader) = &s.loader {
+            loader.validate(&s.version)?;
+        }
     }
     Ok(())
 }
@@ -72,7 +81,61 @@ fn details(name: &str, version: &str, port: u16) -> Result<()> {
 pub fn list(app: &Path) -> Result<Vec<Server>> {
     let doc = Document::<Data>::open(app, "servers-v1.json")?;
     validate(&doc.data)?;
-    Ok(doc.data.servers)
+    Ok(doc
+        .data
+        .servers
+        .into_iter()
+        .filter(|s| !s.archived)
+        .collect())
+}
+pub fn archived(app: &Path) -> Result<Vec<Server>> {
+    let doc = Document::<Data>::open(app, "servers-v1.json")?;
+    validate(&doc.data)?;
+    Ok(doc
+        .data
+        .servers
+        .into_iter()
+        .filter(|s| s.archived)
+        .collect())
+}
+/// Recoverable removal: keep the owned world and identity, hide it from launch choices.
+pub fn set_archived(app: &Path, id: &str, archived: bool) -> Result<()> {
+    let mut doc = Document::<Data>::open(app, "servers-v1.json")?;
+    validate(&doc.data)?;
+    let s = doc
+        .data
+        .servers
+        .iter_mut()
+        .find(|s| s.id == id)
+        .ok_or("服务端选择已失效")?;
+    let (_root, _lock) = maintenance_lock(app, s)?;
+    s.archived = archived;
+    doc.save()
+}
+fn maintenance_lock(app: &Path, s: &Server) -> Result<(DirectoryGuard, fs::File)> {
+    let root = DirectoryGuard::open(&app.join("servers").join(&s.id))?;
+    if root.id != s.object {
+        return Err("服务端目录身份已变化；原数据已保留".into());
+    }
+    let lock = options()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(root.root.join("amberl-session.lock"))
+        .map_err(|e| e.to_string())?;
+    if info(&lock)?.nNumberOfLinks != 1 {
+        return Err("Linked session lock".into());
+    }
+    lock.try_lock().map_err(|_| "请先保存并停止该服务端")?;
+    Ok((root, lock))
+}
+pub(crate) fn content_lock(app: &Path, id: &str) -> Result<(DirectoryGuard, fs::File, Server)> {
+    let s = list(app)?
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or("请选择有效服务端")?;
+    let (root, lock) = maintenance_lock(app, &s)?;
+    Ok((root, lock, s))
 }
 fn artifact(metadata: &serde_json::Value) -> Result<Artifact> {
     let a = &metadata["downloads"]["server"];
@@ -119,6 +182,37 @@ pub fn create(
     eula: bool,
     cancel: &Cancellation,
 ) -> Result<Server> {
+    create_with_loader(
+        app,
+        &Create {
+            name: name.into(),
+            version: version.into(),
+            port,
+            eula,
+            loader: None,
+            java: None,
+        },
+        cancel,
+    )
+}
+pub struct Create {
+    pub name: String,
+    pub version: String,
+    pub port: u16,
+    pub eula: bool,
+    pub loader: Option<crate::loader::Choice>,
+    pub java: Option<std::path::PathBuf>,
+}
+pub fn create_with_loader(app: &Path, request: &Create, cancel: &Cancellation) -> Result<Server> {
+    let Create {
+        name,
+        version,
+        port,
+        eula,
+        loader,
+        java,
+    } = request;
+    let (port, eula) = (*port, *eula);
     details(name, version, port)?;
     if !eula {
         return Err("请先阅读并同意 Minecraft EULA，再创建服务端".into());
@@ -153,6 +247,19 @@ pub fn create(
         .and_then(|_| jar.sync_all())
         .map_err(|e| e.to_string())?;
     drop(jar);
+    let loader = loader
+        .as_ref()
+        .map(|choice| {
+            crate::loader::server::install(
+                &cache,
+                &stage,
+                &metadata,
+                choice,
+                java.as_deref(),
+                cancel,
+            )
+        })
+        .transpose()?;
     for (name, bytes) in [
         ("eula.txt", "eula=true\n".to_string()),
         (
@@ -181,7 +288,9 @@ pub fn create(
         name: name.trim().into(),
         version: version.into(),
         port,
+        loader,
         object: root.id.clone(),
+        archived: false,
     };
     doc.data.servers.push(record.clone());
     doc.save()?;
@@ -283,6 +392,7 @@ pub fn run(
         return Err("Linked session lock".into());
     }
     lock.try_lock().map_err(|_| "该服务端已在运行")?;
+    config::ready(&root.root)?;
     let mut guards = vec![];
     guard_tree(&root.root, 0, &mut 0, &mut guards)?;
     let properties = crate::paths::text(&root.root, &root.root.join("server.properties"), 65536)?;
@@ -335,19 +445,24 @@ pub fn run(
     if size != a.size || hash.finish()? != a.digest {
         return Err("服务端文件校验失败；未启动".into());
     }
+    let _loader_pins = s
+        .loader
+        .as_ref()
+        .map(|l| l.pin(&root.root, &s.version, cancel))
+        .transpose()?;
+    let mut args = vec![format!("-Xmx{memory}M"), "-Xms256M".into()];
+    args.extend(s.loader.as_ref().map_or_else(
+        || vec!["-jar".into(), "server.jar".into()],
+        |l| l.arguments(),
+    ));
+    args.push("nogui".into());
     drop(cache);
     let port = TcpListener::bind(("127.0.0.1", s.port))
         .map_err(|_| "服务端端口已占用，请停止占用程序或创建不同端口的服务端")?;
     drop(port);
     cancel.check()?;
     let mut child = Command::new(&java_path)
-        .args([
-            format!("-Xmx{memory}M"),
-            "-Xms256M".into(),
-            "-jar".into(),
-            "server.jar".into(),
-            "nogui".into(),
-        ])
+        .args(args)
         .current_dir(&root.root)
         .env_remove("JAVA_TOOL_OPTIONS")
         .env_remove("_JAVA_OPTIONS")
@@ -409,11 +524,7 @@ pub(super) fn drain(mut input: impl Read + Send + 'static, sender: mpsc::SyncSen
                 Ok(n) => {
                     for b in &buf[..n] {
                         if *b == b'\n' {
-                            let value = String::from_utf8_lossy(&line)
-                                .trim_end()
-                                .chars()
-                                .filter(|c| !c.is_control() || *c == '\t')
-                                .collect::<String>();
+                            let value = plain_console(&String::from_utf8_lossy(&line));
                             let _ = sender.try_send(value);
                             line.clear();
                         } else if line.len() < 4096 {
@@ -425,10 +536,44 @@ pub(super) fn drain(mut input: impl Read + Send + 'static, sender: mpsc::SyncSen
         }
     });
 }
+fn plain_console(line: &str) -> String {
+    let mut out = String::new();
+    let mut escape = false;
+    let mut csi = false;
+    for c in line.trim_end().chars() {
+        if escape {
+            if !csi && c == '[' {
+                csi = true;
+                continue;
+            }
+            if !csi || ('\u{40}'..='\u{7e}').contains(&c) {
+                escape = false;
+                csi = false;
+            }
+            continue;
+        }
+        if c == '\u{1b}' {
+            escape = true;
+            continue;
+        }
+        if !c.is_control() || c == '\t' {
+            out.push(c);
+        }
+    }
+    out
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn console_strips_terminal_colors_without_damaging_chinese() {
+        assert_eq!(
+            plain_console("\u{1b}[32m世界已保存\u{1b}[0m\r"),
+            "世界已保存"
+        );
+        assert_eq!(plain_console("[INFO] 你好\t世界"), "[INFO] 你好\t世界");
+    }
     #[test]
     fn rejects_unaccepted_eula_bad_ports_and_multiline_commands() {
         let c = Cancellation::default();
@@ -460,6 +605,8 @@ mod tests {
             name: "Test".into(),
             version: "26.3".into(),
             port: 25565,
+            loader: None,
+            archived: false,
             object,
         });
         doc.save().unwrap();

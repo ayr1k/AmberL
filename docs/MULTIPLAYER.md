@@ -7,7 +7,8 @@ This build implements a real Windows x64 vertical slice, not completion of Stage
 
 1. Open **联机 → 创建服务端**, load the official version list, choose a release,
    name and port, read the Minecraft EULA and explicitly accept it. This creates a
-   new Vanilla server under AmberL's own `servers/<id>` directory. No world is imported.
+   new Vanilla, Fabric, Quilt, modern Forge or NeoForge server under AmberL's own
+   `servers/<id>` directory. Loader installation also needs compatible Java. No world is imported.
 2. In **服务端**, refresh/select that server, explicitly choose compatible `java.exe`
    and memory, then start. **控制台** shows bounded output and accepts single-line
    commands. **保存并停止** sends `stop` and waits; it never kills all Java processes.
@@ -73,11 +74,25 @@ evidence is recorded in the PR and validation record.
 **Two peers on one PC are not two physical devices.** Public-relay/NAT behavior,
 two-computer gameplay and disconnect/reconnect acceptance remain open.
 
-This iteration creates only Vanilla servers. Fabric/Forge/Quilt/NeoForge **client**
-installation does not imply modded-server creation, mod synchronization or plugin
-support. Modded servers, FRP configuration, backup/restore/import, a full player
-management UI, translated/accessibility acceptance and clean-machine deployment
-remain future work. No stable release or merge is authorized by this preview.
+Minecraft 26.3 servers with Fabric 0.19.5, Quilt 0.31.0-beta.1, Forge 26.3-66.1.8
+and NeoForge 26.3.0.103 have additionally passed actual readiness, query, console,
+save and reload checks. Vanilla 1.12.2 with downloaded Java 8 and Forge 26.3 with
+downloaded Java 25 also passed verified snapshot/new-copy restoration and startup.
+
+**服务端配置** edits description, player limit, view distance, difficulty and mode
+only while stopped. It detects stale edits and preserves unknown properties. A
+durable recovery record blocks launch after interrupted writes until recovery; the
+interrupted bytes are retained too. Chinese descriptions use Java property escapes.
+The listener and authentication boundaries above remain enforced at startup.
+
+**备份恢复** snapshots stopped app-owned servers. Restoration verifies every saved
+file and creates a separate server; it never replaces the source world. Recoverable
+removal hides the server while retaining its data and identity. **管理服务端模组**
+uses the owned-content workflow described in CONTENT.md; it is not mod synchronization.
+
+Plugins, FRP configuration, reconnect/two-device acceptance, a full player management
+UI, translation/accessibility acceptance and clean-machine deployment remain open.
+No stable release or merge is authorized by this preview.
 
 Provider references: [Minecraft server](https://www.minecraft.net/en-us/download/server),
 [EasyTier release](https://github.com/EasyTier/EasyTier/releases/tag/v2.6.4),

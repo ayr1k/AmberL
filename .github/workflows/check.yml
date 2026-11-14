@@ -53,5 +53,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AmberL-ui-comparison-${{ github.event.pull_request.head.sha || github.sha }}
-          path: artifacts/AmberL-ui-comparison-*.zip
+          path: |
+            artifacts/AmberL-ui-comparison-*.zip
+            artifacts/AmberL-test-*-windows-x64.exe
+            artifacts/AmberL-test-*-windows-x64.exe.sha256
           if-no-files-found: error

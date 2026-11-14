@@ -12,7 +12,7 @@ Copy-Item (Join-Path $SlintTarget 'release/amberl-slint-probe.exe') -Destination
 # Preserve all SDK runtime assets and subdirectories; exclude build/debug products.
 Get-ChildItem local/ui-build/winui | Where-Object { $_.Name -notmatch '\.(pdb|lib|exp|ilk|iobj|ipdb|recipe)$' -and $_.Name -ne 'amberl-winui-probe.pri' } | Copy-Item -Destination (Join-Path $package 'winui') -Recurse
 Copy-Item assets/instance-icons/LICENSE-lucide.txt -Destination (Join-Path $package 'licenses')
-Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,docs/MULTIPLAYER.md,design-qa.md -Destination $package
+Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,docs/MULTIPLAYER.md,docs/CONTENT.md,docs/FIRST-VERSION.md,docs/INSTALLER.md,design-qa.md -Destination $package
 Copy-Item scripts/make-fixture.ps1 -Destination (Join-Path $package 'scripts')
 git -c core.autocrlf=false archive --format=zip "--output=$package/AmberL-source.zip" HEAD
 if ($LASTEXITCODE) { throw 'Exact source archive failed' }
@@ -60,3 +60,4 @@ $checksums = Get-ChildItem -LiteralPath $package -File -Recurse | Sort-Object Fu
 Set-Content -LiteralPath (Join-Path $package 'SHA256SUMS.txt') -Value $checksums -Encoding utf8
 Compress-Archive -LiteralPath $package -DestinationPath ($package + '.zip')
 Get-FileHash -LiteralPath ($package + '.zip') -Algorithm SHA256
+& ./scripts/package-installer.ps1 -PackageRoot $package

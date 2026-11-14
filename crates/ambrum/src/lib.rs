@@ -6,6 +6,8 @@ pub mod auth;
 #[cfg(windows)]
 pub mod catalog;
 #[cfg(windows)]
+pub mod content;
+#[cfg(windows)]
 pub mod download;
 #[cfg(windows)]
 pub mod install;

@@ -12,7 +12,7 @@ use std::{
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
-fn repo(kind: &str) -> Result<&'static str> {
+pub(super) fn repo(kind: &str) -> Result<&'static str> {
     match kind {
         "Forge" => Ok("https://maven.minecraftforge.net/net/minecraftforge/forge"),
         "NeoForge" => Ok("https://maven.neoforged.net/releases/net/neoforged/neoforge"),
@@ -81,7 +81,7 @@ pub(super) fn versions(
     result.reverse();
     Ok(result)
 }
-fn write_new(root: &Path, relative: &str, bytes: &mut impl Read) -> Result<()> {
+pub(super) fn write_new(root: &Path, relative: &str, bytes: &mut impl Read) -> Result<()> {
     crate::manifest::relative_path(relative)?;
     let target = root.join(relative);
     let parent = target.parent().ok_or("Missing work parent")?;
@@ -95,7 +95,12 @@ fn write_new(root: &Path, relative: &str, bytes: &mut impl Read) -> Result<()> {
     std::io::copy(bytes, &mut output).map_err(|e| e.to_string())?;
     output.sync_all().map_err(|e| e.to_string())
 }
-fn import_file(cache: &Cache, root: &Path, path: &Path, cancel: &Cancellation) -> Result<Value> {
+pub(super) fn import_file(
+    cache: &Cache,
+    root: &Path,
+    path: &Path,
+    cancel: &Cancellation,
+) -> Result<Value> {
     let _guard = DirectoryGuard::open(path.parent().ok_or("Missing output parent")?)?;
     let mut file = options()
         .share_mode(windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ)

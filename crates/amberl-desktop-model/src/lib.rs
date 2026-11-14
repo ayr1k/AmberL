@@ -20,6 +20,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+pub mod content;
 pub mod network;
 
 #[derive(Clone, Debug)]
@@ -69,6 +70,7 @@ impl LaunchChoice {
     }
 }
 enum Message {
+    Content(content::Response),
     Data(Vec<Game>, Vec<Profile>),
     Java(Vec<Candidate>),
     Catalog(Vec<ambrum::catalog::Version>),
@@ -79,11 +81,13 @@ enum Message {
     Finished(Result<()>),
 }
 enum Operation {
+    Content(content::Request),
     Reload,
     Catalog,
     Loaders(String, String),
     Attach(PathBuf),
     Java,
+    InstallJava(u32),
     Login,
     Forget(String),
     Launch(LaunchChoice),
@@ -121,6 +125,7 @@ pub struct Model {
     pub java_revision: u64,
     pub running: bool,
     pub network: network::Network,
+    pub content: content::Content,
     pub preferences: std::collections::BTreeMap<String, ambrum::preferences::Launch>,
     worker: Option<Worker>,
     log: VecDeque<String>,
@@ -131,6 +136,7 @@ impl Model {
         let (selected, preferences) = saved.as_ref().cloned().unwrap_or_default();
         Self {
             network: network::Network::new(app.clone()),
+            content: content::Content::default(),
             app,
             games: vec![],
             accounts: vec![],
@@ -204,6 +210,9 @@ impl Model {
     }
     pub fn discover_java(&mut self) -> Result<()> {
         self.start(Operation::Java)
+    }
+    pub fn install_java(&mut self, major: u32) -> Result<()> {
+        self.start(Operation::InstallJava(major))
     }
     pub fn login(&mut self) -> Result<()> {
         self.start(Operation::Login)
@@ -339,6 +348,13 @@ impl Model {
                 }
             };
             match message {
+                Message::Content(response) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.content.apply(response);
+                    self.revision += 1;
+                }
                 Message::Data(games, accounts) => {
                     if worker.cancel.check().is_err() {
                         continue;
@@ -525,7 +541,22 @@ fn execute(
             Registry::open(app)?.attach(&path)?;
             reload(app, cancel, sender)
         }
-        Operation::Java => send(sender, Message::Java(ambrum::java::discover(cancel)?)),
+        Operation::Content(request) => content::execute(app, request, cancel, sender),
+        Operation::Java => {
+            let mut rows = ambrum::java::runtime::discover(app, cancel)?;
+            rows.extend(ambrum::java::discover(cancel)?);
+            send(sender, Message::Java(rows))
+        }
+        Operation::InstallJava(major) => {
+            ambrum::java::runtime::install(app, major, cancel, |done, total| {
+                let _ = sender.try_send(Message::Status(format!(
+                    "正在下载并校验 Java {major}：{done}/{total}"
+                )));
+            })?;
+            let mut rows = ambrum::java::runtime::discover(app, cancel)?;
+            rows.extend(ambrum::java::discover(cancel)?);
+            send(sender, Message::Java(rows))
+        }
         Operation::Forget(id) => {
             Store::open(app)?.forget(&id)?;
             reload(app, cancel, sender)

@@ -171,3 +171,10 @@ Quick Play joining where supported. A real authenticated Vanilla 26.3 client ent
 server through two room peers on one PC and exited normally; this does not establish
 two-device or public-relay acceptance. Per-game Java/account ID/memory choices persist.
 See [the multiplayer guide](docs/MULTIPLAYER.md) for host/join steps and open gates.
+
+The current development work also adds actual modded servers, verified server
+backups/new-copy recovery, stopped-server configuration, official Java downloads and
+recoverable Modrinth content groups with optional dependency choices. See
+[content/Java](docs/CONTENT.md), [test installer](docs/INSTALLER.md) and the
+[full first-version completion ledger](docs/FIRST-VERSION.md). This is still a
+development preview; two-device acceptance and other listed first-version work remain.

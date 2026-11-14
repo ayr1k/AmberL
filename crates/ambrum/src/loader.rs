@@ -15,6 +15,7 @@ use std::{
     path::Path,
 };
 mod forge;
+pub mod server;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Choice {
     pub kind: String,

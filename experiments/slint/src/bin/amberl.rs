@@ -7,7 +7,7 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
 #[path = "../glass.rs"]
 mod glass;
-slint::slint! { export { Launcher, GameRow, GlassAssets, VersionRow } from "ui/launcher.slint"; }
+slint::slint! { export { Launcher, GameRow, GlassAssets, VersionRow, OptionalRow } from "ui/launcher.slint"; }
 
 #[derive(Default)]
 struct View {
@@ -18,6 +18,17 @@ struct View {
     account: Option<String>,
     selected: Option<String>,
     network_revision: u64,
+    server_loader_key: (String, String),
+    server_loaders: Vec<String>,
+    backup_ids: Vec<String>,
+    archived_ids: Vec<String>,
+    content_revision: u64,
+    content_projects: Vec<String>,
+    content_versions: Vec<String>,
+    content_groups: Vec<String>,
+    content_plan: String,
+    configuration_key: (String, String),
+    configuration_revision: u64,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
@@ -51,6 +62,69 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     if view.revision == model.revision && view.network_revision == model.network.revision {
         return;
     }
+    if view.content_revision != model.content.revision {
+        let c = &model.content;
+        let projects = c.projects.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
+        let versions = c.versions.iter().map(|v| v.id.clone()).collect::<Vec<_>>();
+        let groups = c.groups.iter().map(|g| g.id.clone()).collect::<Vec<_>>();
+        if projects != view.content_projects {
+            ui.set_content_project_index(-1);
+            view.content_projects = projects;
+        }
+        if versions != view.content_versions {
+            ui.set_content_version_index(-1);
+            view.content_versions = versions;
+        }
+        if groups != view.content_groups {
+            ui.set_content_group_index(-1);
+            view.content_groups = groups;
+        }
+        if c.planned_version != view.content_plan {
+            ui.set_content_step(if c.plan.is_some() { 1 } else { 0 });
+            view.content_plan = c.planned_version.clone();
+        }
+        ui.set_content_target(c.title.as_str().into());
+        ui.set_content_group_states(strings(c.groups.iter().map(|g| g.state.clone()).collect()));
+        ui.set_content_projects(strings(
+            c.projects.iter().map(|p| p.title.clone()).collect(),
+        ));
+        ui.set_content_versions(strings(
+            c.versions.iter().map(|v| v.title.clone()).collect(),
+        ));
+        ui.set_content_groups(strings(
+            c.groups
+                .iter()
+                .map(|g| {
+                    format!(
+                        "{} · {}",
+                        g.title,
+                        match g.state.as_str() {
+                            "installed" => "已安装",
+                            "pending" => "安装未完成",
+                            "removing" => "移除未完成",
+                            "removed" => "已移除，可恢复",
+                            _ => "恢复未完成",
+                        }
+                    )
+                })
+                .collect(),
+        ));
+        ui.set_content_preview(c.preview().into());
+        ui.set_content_optional(ModelRc::new(VecModel::from(c.plan.as_ref().map_or_else(
+            Vec::new,
+            |p| {
+                p.optional
+                    .iter()
+                    .map(|o| OptionalRow {
+                        title: o.title.as_str().into(),
+                        selected: o.selected,
+                    })
+                    .collect()
+            },
+        ))));
+        ui.set_content_has_plan(c.plan.is_some());
+        view.content_revision = c.revision;
+    }
     if view.selected != model.selected && model.selected_game().is_some() {
         if let Some(p) = model
             .selected
@@ -66,10 +140,65 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     }
     if view.network_revision != model.network.revision {
         let n = &model.network;
+        let config = n
+            .configuration
+            .as_ref()
+            .filter(|c| Some(&c.server) == n.selected.as_ref());
+        ui.set_server_config_ready(config.is_some());
+        let key = config.map_or_else(Default::default, |c| (c.server.clone(), c.digest.clone()));
+        if key != view.configuration_key || n.configuration_revision != view.configuration_revision
+        {
+            if let Some(c) = config {
+                ui.set_server_motd(c.settings.motd.as_str().into());
+                ui.set_server_players(c.settings.players.into());
+                ui.set_server_distance(c.settings.distance.into());
+                ui.set_server_difficulty(c.settings.difficulty.as_str().into());
+                ui.set_server_mode(c.settings.mode.as_str().into());
+            }
+            view.configuration_key = key;
+            view.configuration_revision = n.configuration_revision;
+        }
+        let backup_ids = n.backups.iter().map(|b| b.id.clone()).collect::<Vec<_>>();
+        let archived_ids = n.archived.iter().map(|b| b.id.clone()).collect::<Vec<_>>();
+        if view.backup_ids != backup_ids {
+            ui.set_backup_index(-1);
+            view.backup_ids = backup_ids;
+        }
+        if view.archived_ids != archived_ids {
+            ui.set_archived_index(-1);
+            view.archived_ids = archived_ids;
+        }
+        ui.set_backup_options(strings(
+            n.backups
+                .iter()
+                .map(|b| format!("{} · {} · {}", b.name, b.version, &b.id[..6]))
+                .collect(),
+        ));
+        ui.set_archived_options(strings(
+            n.archived
+                .iter()
+                .map(|s| format!("{} · {}", s.name, &s.id[..6]))
+                .collect(),
+        ));
+        if view.server_loader_key != n.loader_key || view.server_loaders != n.loaders {
+            ui.set_server_loader_options(strings(n.loaders.clone()));
+            ui.set_server_loader_index(if n.loaders.is_empty() { -1 } else { 0 });
+            view.server_loader_key = n.loader_key.clone();
+            view.server_loaders = n.loaders.clone();
+        }
         ui.set_server_options(strings(
             n.servers
                 .iter()
-                .map(|s| format!("{} · {} · :{} · {}", s.name, s.version, s.port, &s.id[..6]))
+                .map(|s| {
+                    format!(
+                        "{} · {} {} · :{} · {}",
+                        s.name,
+                        s.version,
+                        s.loader.as_ref().map_or("原版", |l| l.choice.kind.as_str()),
+                        s.port,
+                        &s.id[..6]
+                    )
+                })
                 .collect(),
         ));
         ui.set_server_index(
@@ -189,6 +318,65 @@ fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<
         memory_mib: u32::try_from(ui.get_memory_mib()).map_err(|_| "无效内存")?,
     })
 }
+fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
+    {
+        let model = model.clone();
+        ui.on_select_optional(move |index, selected| {
+            operation(&model, |m| m.select_optional_content(index, selected))
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_open_content(move |server| {
+            if let Some(u) = weak.upgrade() {
+                let result = model.borrow_mut().open_content(server);
+                match result {
+                    Ok(()) => {
+                        u.set_content_step(0);
+                        u.set_content_tab(0);
+                        u.set_panel(8);
+                    }
+                    Err(e) => model.borrow_mut().report(e),
+                }
+            }
+        });
+    }
+    macro_rules! action {
+        ($name:ident,$f:expr) => {{
+            let model = model.clone();
+            let weak = ui.as_weak();
+            ui.$name(move || {
+                if let Some(u) = weak.upgrade() {
+                    operation(&model, |m| $f(&u, m));
+                }
+            });
+        }};
+    }
+    action!(on_search_content, |u: &Launcher, m: &mut Model| {
+        let kind = *["mod", "resourcepack", "shader"]
+            .get(usize::try_from(u.get_content_kind_index()).map_err(|_| "请选择内容类型")?)
+            .ok_or("请选择内容类型")?;
+        m.search_content(kind.into(), u.get_content_query().to_string())
+    });
+    action!(on_content_project, |u: &Launcher, m: &mut Model| m
+        .content_versions(u.get_content_project_index()));
+    action!(on_preview_content, |u: &Launcher, m: &mut Model| m
+        .preview_content(u.get_content_version_index()));
+    action!(on_install_content, |u: &Launcher, m: &mut Model| m
+        .install_content(u.get_content_version_index()));
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_change_content(move |action| {
+            if let Some(u) = weak.upgrade() {
+                operation(&model, |m| {
+                    m.change_content(u.get_content_group_index(), action.to_string())
+                });
+            }
+        });
+    }
+}
 fn net(
     model: &Rc<RefCell<Model>>,
     f: impl FnOnce(&mut amberl_desktop_model::network::Network) -> ambrum::Result<()>,
@@ -211,6 +399,26 @@ fn network_callbacks(ui: &Launcher, model: &Rc<RefCell<Model>>) {
         }};
     }
     action!(
+        on_load_server_config,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.load_configuration(false)
+    );
+    action!(
+        on_recover_server_config,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.load_configuration(true)
+    );
+    action!(
+        on_save_server_config,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n.save_configuration(
+            ambrum::multiplayer::server::config::Settings {
+                motd: u.get_server_motd().to_string(),
+                players: u16::try_from(u.get_server_players()).map_err(|_| "无效人数")?,
+                distance: u8::try_from(u.get_server_distance()).map_err(|_| "无效视距")?,
+                difficulty: u.get_server_difficulty().to_string(),
+                mode: u.get_server_mode().to_string()
+            }
+        )
+    );
+    action!(
         on_refresh_servers,
         |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.reload()
     );
@@ -228,18 +436,72 @@ fn network_callbacks(ui: &Launcher, model: &Rc<RefCell<Model>>) {
                         .map_err(|_| "请选择服务端版本")?,
                 )
                 .ok_or("请选择服务端版本")?;
-            n.create(
-                u.get_server_name().to_string(),
-                version.to_string(),
-                u.get_server_port(),
-                u.get_server_eula(),
-            )
+            let kind = u.get_server_loader_kind().to_string();
+            let loader = if kind == "原版" {
+                None
+            } else {
+                if n.loader_key != (version.to_string(), kind.clone()) {
+                    return Err("请刷新当前游戏的加载器列表".into());
+                }
+                Some(ambrum::loader::Choice {
+                    kind,
+                    version: n
+                        .loaders
+                        .get(
+                            usize::try_from(u.get_server_loader_index())
+                                .map_err(|_| "请选择加载器版本")?,
+                        )
+                        .ok_or("请选择加载器版本")?
+                        .clone(),
+                })
+            };
+            n.create(ambrum::multiplayer::server::Create {
+                name: u.get_server_name().to_string(),
+                version: version.to_string(),
+                port: u16::try_from(u.get_server_port()).map_err(|_| "无效端口")?,
+                eula: u.get_server_eula(),
+                loader,
+                java: Some(u.get_java_path().as_str().into()),
+            })
+        }
+    );
+    action!(
+        on_load_server_loaders,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| {
+            let version = u
+                .get_server_versions()
+                .row_data(
+                    usize::try_from(u.get_server_version_index()).map_err(|_| "请选择游戏版本")?,
+                )
+                .ok_or("请选择游戏版本")?;
+            n.load_loaders(version.to_string(), u.get_server_loader_kind().to_string())
         }
     );
     action!(
         on_start_server,
         |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
             .start_server(u.get_java_path().as_str().into(), u.get_server_memory())
+    );
+    action!(
+        on_backup_server,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.backup()
+    );
+    action!(
+        on_archive_server,
+        |_: &Launcher, n: &mut amberl_desktop_model::network::Network| n.archive(None)
+    );
+    action!(
+        on_restore_archived,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n
+            .archive(Some(u.get_archived_index()))
+    );
+    action!(
+        on_restore_backup,
+        |u: &Launcher, n: &mut amberl_desktop_model::network::Network| n.restore_backup(
+            u.get_backup_index(),
+            u.get_restore_name().to_string(),
+            u.get_restore_port()
+        )
     );
     action!(
         on_stop_server,
@@ -367,6 +629,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .on_tile(move |x, y, w, h, vw, vh| glass.borrow_mut().tile([x, y, w, h, vw, vh]));
     ui.global::<GlassAssets>().set_ready(true);
     let model = Rc::new(RefCell::new(Model::new(app)));
+    content_bindings(&ui, &model);
     let view = Rc::new(RefCell::new(View::default()));
     let os = windows_version();
     network_callbacks(&ui, &model);
@@ -495,6 +758,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     {
         let model = model.clone();
         ui.on_discover_java(move || operation(&model, Model::discover_java));
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_install_java(move || {
+            if let Some(ui) = weak.upgrade() {
+                operation(&model, |m| {
+                    let major = *[8, 16, 17, 21, 25]
+                        .get(
+                            usize::try_from(ui.get_java_download_index())
+                                .map_err(|_| "请选择 Java 版本")?,
+                        )
+                        .ok_or("请选择 Java 版本")?;
+                    m.install_java(major)
+                });
+            }
+        });
     }
     {
         let model = model.clone();
