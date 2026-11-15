@@ -50,7 +50,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve exact dependency notices.' }
 $resolvedPackages = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($node in $metadata.resolve.nodes) { [void]$resolvedPackages.Add($node.id) }
 $noticeRoot = Join-Path $packageRoot 'licenses'
-New-Item -ItemType Directory -Path $noticeRoot | Out-Null
+New-Item -ItemType Directory -Path $noticeRoot -Force | Out-Null
 foreach ($package in $metadata.packages | Where-Object { $_.source -and $resolvedPackages.Contains($_.id) }) {
     $destination = Join-Path $noticeRoot ($package.name + '-' + $package.version)
     New-Item -ItemType Directory -Path $destination | Out-Null
