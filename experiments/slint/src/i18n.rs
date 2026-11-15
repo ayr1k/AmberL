@@ -5,6 +5,12 @@ pub fn text(english: bool, value: &str) -> &str {
         return value;
     }
     match value {
+        "次下载" => "downloads",
+        "个文件" => "files",
+        "正在加载兼容内容…" => "Loading compatible content…",
+        "内容信息正在加载，请稍候或重新打开" => {
+            "Content information is loading. Wait or reopen the page."
+        }
         "Java 运行环境已安装并校验" => "Java runtime installed and verified",
         "设备码已复制" => "Device code copied",
         "复制失败，请点击复制设备码重试" => {

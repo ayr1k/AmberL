@@ -13,6 +13,8 @@ mod diagnostics;
 mod glass;
 #[path = "../i18n.rs"]
 mod i18n;
+#[path = "../thumbnails.rs"]
+mod thumbnails;
 #[path = "../window.rs"]
 mod window;
 slint::include_modules!();
@@ -40,6 +42,8 @@ struct View {
     configuration_revision: u64,
     frp_revision: u64,
     copied_device_code: String,
+    memory_value: i32,
+    thumbnails: thumbnails::Thumbnails,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
@@ -73,7 +77,22 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     let english = ui.global::<Locale>().get_english();
     let tr = |value: &str| -> SharedString { i18n::message(english, value).into() };
     ui.set_login_remaining(model.login_remaining());
-    if view.revision == model.revision && view.network_revision == model.network.revision {
+    if view.memory_value != ui.get_memory_mib() {
+        let memory = memory_values(ui.get_memory_mib());
+        ui.set_memory_options(strings(memory.iter().map(|n| format!("{n} MiB")).collect()));
+        ui.set_memory_index(
+            memory
+                .iter()
+                .position(|n| *n == ui.get_memory_mib())
+                .unwrap_or(0) as i32,
+        );
+        view.memory_value = ui.get_memory_mib();
+    }
+    let icons_changed = view.thumbnails.poll();
+    if view.revision == model.revision
+        && view.network_revision == model.network.revision
+        && !icons_changed
+    {
         return;
     }
     if view.maintenance_revision != model.maintenance.revision {
@@ -115,7 +134,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         ui.set_archived_game_index(-1);
         view.maintenance_revision = m.revision;
     }
-    if view.content_revision != model.content.revision {
+    if view.content_revision != model.content.revision || icons_changed {
         let c = &model.content;
         ui.set_content_server(c.context.as_ref().is_some_and(|c| c.server));
         ui.set_content_match_game(c.browse.game);
@@ -134,7 +153,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
             view.content_projects = projects;
         }
         if versions != view.content_versions {
-            ui.set_content_version_index(-1);
+            ui.set_content_version_index(if versions.is_empty() { -1 } else { 0 });
             view.content_versions = versions;
         }
         if groups != view.content_groups {
@@ -142,41 +161,50 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
             view.content_groups = groups;
         }
         if c.planned_version != view.content_plan {
-            ui.set_content_step(if c.plan.is_some() { 1 } else { 0 });
+            if c.plan.is_some() {
+                ui.set_content_step(1);
+            }
             view.content_plan = c.planned_version.clone();
         }
         ui.set_content_target(i18n::content_target(english, &c.title).into());
         ui.set_content_group_states(strings(c.groups.iter().map(|g| g.state.clone()).collect()));
-        ui.set_content_projects(strings(
-            c.projects.iter().map(|p| p.title.clone()).collect(),
-        ));
+        ui.set_content_offset(c.offset as i32);
+        ui.set_content_total(c.total as i32);
+        ui.set_content_loaded(c.loaded);
+        view.thumbnails.request(
+            c.projects
+                .iter()
+                .filter_map(|p| p.icon_url.clone())
+                .collect(),
+        );
+        ui.set_content_projects(ModelRc::new(VecModel::from(
+            c.projects
+                .iter()
+                .enumerate()
+                .map(|(i, p)| ContentRow {
+                    title: p.title.as_str().into(),
+                    icon: view.thumbnails.image(p.icon_url.as_deref()),
+                    has_icon: view.thumbnails.has(p.icon_url.as_deref()),
+                    initial: p.title.chars().next().unwrap_or('•').to_string().into(),
+                    description: p.description.as_str().into(),
+                    meta: format!(
+                        "{} · {} {}",
+                        p.author,
+                        p.downloads,
+                        i18n::text(english, "次下载")
+                    )
+                    .into(),
+                    index: i as i32,
+                })
+                .collect::<Vec<_>>(),
+        )));
         ui.set_content_versions(strings(
             c.versions
                 .iter()
                 .map(|v| i18n::subtitle(english, &v.title))
                 .collect(),
         ));
-        ui.set_content_groups(strings(
-            c.groups
-                .iter()
-                .map(|g| {
-                    format!(
-                        "{} · {}",
-                        g.title,
-                        i18n::text(
-                            english,
-                            match g.state.as_str() {
-                                "installed" => "已安装",
-                                "pending" => "安装未完成",
-                                "removing" => "移除未完成",
-                                "removed" => "已移除，可恢复",
-                                _ => "恢复未完成",
-                            }
-                        )
-                    )
-                })
-                .collect(),
-        ));
+        filter_installed(ui, model);
         ui.set_content_preview(
             c.preview()
                 .lines()
@@ -493,6 +521,86 @@ fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<
         memory_mib: u32::try_from(ui.get_memory_mib()).map_err(|_| "无效内存")?,
     })
 }
+fn memory_values(current: i32) -> Vec<i32> {
+    let mut values = vec![
+        512, 1024, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768, 49152, 65536,
+    ];
+    if (512..=65536).contains(&current) && !values.contains(&current) {
+        values.push(current);
+        values.sort_unstable();
+    }
+    values
+}
+fn filter_installed(ui: &Launcher, model: &Model) {
+    let english = ui.global::<Locale>().get_english();
+    let query = ui.get_installed_query().to_lowercase();
+    let filter = ui.get_installed_filter();
+    let groups = model
+        .content
+        .groups
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| {
+            (query.is_empty()
+                || g.title.to_lowercase().contains(&query)
+                || g.details().to_lowercase().contains(&query))
+                && match filter {
+                    1 => g.state == "installed",
+                    2 => g.state == "removed",
+                    3 => g.state != "installed" && g.state != "removed",
+                    _ => true,
+                }
+        })
+        .collect::<Vec<_>>();
+    ui.set_installed_total(groups.len() as i32);
+    let page = ui
+        .get_installed_page()
+        .max(0)
+        .min((groups.len().saturating_sub(1) / 20) as i32);
+    ui.set_installed_page(page);
+    let rows = groups
+        .into_iter()
+        .skip(page as usize * 20)
+        .take(20)
+        .map(|(index, g)| {
+            let state = i18n::text(
+                english,
+                match g.state.as_str() {
+                    "installed" => "已安装",
+                    "removed" => "已移除，可恢复",
+                    "pending" => "安装未完成",
+                    "removing" => "移除未完成",
+                    _ => "恢复未完成",
+                },
+            );
+            ContentRow {
+                title: g.title.as_str().into(),
+                icon: slint::Image::default(),
+                has_icon: false,
+                initial: g.title.chars().next().unwrap_or('•').to_string().into(),
+                description: g.details().lines().next().unwrap_or("").into(),
+                meta: format!(
+                    "{state} · {} {}",
+                    g.file_count(),
+                    i18n::text(english, "个文件")
+                )
+                .into(),
+                index: index as i32,
+            }
+        })
+        .collect::<Vec<_>>();
+    if !rows.iter().any(|r| r.index == ui.get_content_group_index()) {
+        ui.set_content_group_index(-1);
+        ui.set_installed_details("".into());
+    }
+    ui.set_content_groups(ModelRc::new(VecModel::from(rows)));
+    if let Some(g) = usize::try_from(ui.get_content_group_index())
+        .ok()
+        .and_then(|i| model.content.groups.get(i))
+    {
+        ui.set_installed_details(g.details().into());
+    }
+}
 fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
     {
         let model = model.clone();
@@ -509,6 +617,16 @@ fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
                 match result {
                     Ok(()) => {
                         u.set_content_step(0);
+                        u.set_content_query(model.borrow().content.query.as_str().into());
+                        u.set_content_sort(
+                            ["relevance", "downloads", "updated", "newest"]
+                                .iter()
+                                .position(|s| *s == model.borrow().content.sort)
+                                .unwrap_or(0) as i32,
+                        );
+                        u.set_installed_query("".into());
+                        u.set_installed_filter(0);
+                        u.set_installed_page(0);
                         u.set_content_tab(0);
                         u.set_panel(8);
                     }
@@ -532,14 +650,78 @@ fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
         let kind = *["mod", "resourcepack", "shader", "plugin"]
             .get(usize::try_from(u.get_content_kind_index()).map_err(|_| "请选择内容类型")?)
             .ok_or("请选择内容类型")?;
-        m.search_content(
+        m.search_content_page(
             kind.into(),
             u.get_content_query().to_string(),
             ambrum::content::modrinth::Browse {
                 game: u.get_content_match_game(),
                 loader: u.get_content_match_loader(),
             },
+            0,
+            ["relevance", "downloads", "updated", "newest"]
+                .get(u.get_content_sort() as usize)
+                .copied()
+                .unwrap_or("relevance")
+                .into(),
+            true,
         )
+    });
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_content_page(move |direction| {
+            if let Some(_u) = weak.upgrade() {
+                operation(&model, |m| {
+                    let c = &m.content;
+                    let offset = if direction < 0 {
+                        c.offset.saturating_sub(20)
+                    } else {
+                        c.offset + 20
+                    };
+                    if offset >= c.total && offset != 0 {
+                        return Ok(());
+                    }
+                    m.search_content_page(
+                        c.kind.clone(),
+                        c.query.clone(),
+                        c.browse,
+                        offset,
+                        c.sort.clone(),
+                        false,
+                    )
+                });
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_filter_installed(move || {
+            if let Some(u) = weak.upgrade() {
+                filter_installed(&u, &model.borrow());
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_select_installed(move |index| {
+            if let Some(u) = weak.upgrade() {
+                if let Some(g) = usize::try_from(index)
+                    .ok()
+                    .and_then(|i| model.borrow().content.groups.get(i).cloned())
+                {
+                    u.set_installed_details(g.details().into());
+                }
+            }
+        });
+    }
+    action!(on_refresh_content, |u: &Launcher, m: &mut Model| {
+        m.refresh_content()?;
+        u.set_content_query("".into());
+        u.set_content_sort(0);
+        u.set_content_step(0);
+        Ok(())
     });
     action!(on_content_project, |u: &Launcher, m: &mut Model| m
         .content_versions(u.get_content_project_index()));
@@ -1257,6 +1439,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             operation(&model, |m| {
                 m.forget(view.borrow().account.clone().unwrap_or_default())
             });
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        ui.on_choose_memory(move |index| {
+            if let Some(u) = weak.upgrade() {
+                if let Some(n) = usize::try_from(index)
+                    .ok()
+                    .and_then(|i| memory_values(u.get_memory_mib()).get(i).copied())
+                {
+                    u.set_memory_mib(n);
+                }
+            }
         });
     }
     {

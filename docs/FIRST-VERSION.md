@@ -1,6 +1,16 @@
 # First-version completion ledger / 首版完成清单
 
 
+## Latest content UI candidate (manual acceptance pending)
+
+The user reported persistent dropdown outlines, numeric-only memory selection, empty
+first content load, slow browsing and sparse lists without pagination. The candidate
+adds quiet mouse dropdown focus, memory presets, automatic first search, metadata-only
+browse snapshots, cached paged results, richer project rows and paginated installed
+groups. See [CONTENT.md](CONTENT.md) for behavior and limits. This candidate is built
+and packaged only; no application, network or UI tests were run at the user's request.
+Earlier revision evidence does not certify these changes. No merge/release authorized.
+
 ## Latest download refinement (manual acceptance pending)
 
 The user reported very slow and failed in-launcher game/Java downloads. Serial

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
-import { Button, LineEdit, ComboBox, SpinBox, ListView, ScrollView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
+import { Button, LineEdit, SpinBox, ListView, ScrollView, TextEdit, CheckBox, AboutSlint, Palette } from "std-widgets.slint";
 
 
 export struct GameRow { id: string, title: string, subtitle: string, icon: string }
 export struct VersionRow { id: string, kind: string }
+export struct ContentRow { title: string, description: string, meta: string, initial: string, icon: image, has-icon: bool, index: int }
 export struct OptionalRow { title: string, selected: bool }
 export global Locale {
     in-out property <bool> english: false;
@@ -56,6 +57,85 @@ component Action inherits Rectangle {
         key-pressed(event) => { if !event.modifiers.alt && !event.modifiers.control && !event.modifiers.meta && (event.text == "\n" || event.text == " ") { root.clicked(); return accept; } return reject; }
     }
     touch := TouchArea { enabled: root.enabled; clicked => { focus.focus(); root.clicked(); } }
+}
+// Mouse focus is quiet; keyboard focus remains visible for navigation.
+component ComboBox inherits Rectangle {
+    in property <[string]> model;
+    in property <bool> enabled: true;
+    in-out property <int> current-index: 0;
+    out property <string> current-value: current-index >= 0 && current-index < model.length ? model[current-index] : "";
+    callback selected(string);
+    property <int> pending: 0;
+    property <bool> popup-open: false;
+    height: 40px; min-width: 90px; horizontal-stretch: 1; vertical-stretch: 0;
+    background: enabled ? mouse.has-hover ? Theme.hover : Theme.control : Theme.inset;
+    border-radius: 8px; border-width: 1px;
+    border-color: field.has-focus && Theme.keyboard-focus ? Theme.focus : Theme.border;
+    forward-focus: field;
+    accessible-role: combobox; accessible-enabled: enabled; accessible-value: current-value;
+    accessible-expandable: true; accessible-expanded: popup-open;
+    accessible-action-expand => { if enabled { root.show(); } }
+    function show() { pending = max(0,current-index); popup-open=true; options.show(); }
+    function choose() { if pending >= 0 && pending < model.length { current-index=pending; selected(current-value); } popup-open=false; options.close(); field.focus(); }
+    HorizontalLayout { padding-left: 12px; padding-right: 12px; spacing: 8px;
+        Text { text: root.current-value; color: root.enabled ? Theme.text : Theme.disabled; overflow: elide; vertical-alignment: center; }
+        Text { width: 14px; text: "⌄"; color: Theme.secondary; vertical-alignment: center; }
+    }
+    field := FocusScope { enabled: root.enabled;
+        key-pressed(e) => {
+            Theme.keyboard-focus=true;
+            if e.text == Key.Return || e.text == " " || e.text == Key.DownArrow { root.show(); return accept; }
+            return reject;
+        }
+    }
+    mouse := TouchArea { enabled: root.enabled; clicked => { field.focus(); root.show(); } }
+    options := PopupWindow { x: 0px; y: root.height + 4px; width: root.width; height: min(7,root.model.length) * 38px + 8px;
+        close-policy: close-on-click-outside;
+        forward-focus: menu;
+        Rectangle { background: Theme.light ? #f5faf7 : #183039; border-width: 1px; border-color: Theme.border; border-radius: 8px; }
+        menu := FocusScope {
+            focus-changed-event => { root.popup-open=self.has-focus; }
+            key-pressed(e) => {
+                Theme.keyboard-focus=true;
+                if e.text == Key.Escape { root.popup-open=false; options.close(); field.focus(); return accept; }
+                if e.text == Key.Tab { root.popup-open=false; options.close(); return reject; }
+                if e.text == Key.DownArrow { root.pending=min(root.model.length - 1,root.pending + 1); return accept; }
+                if e.text == Key.UpArrow { root.pending=max(0,root.pending - 1); return accept; }
+                if e.text == Key.Return || e.text == " " { root.choose(); return accept; }
+                return reject;
+            }
+            ScrollView { content-y: -max(0,root.pending - 5)*38px;
+                VerticalLayout { padding: 4px; spacing: 0px;
+                    for value[index] in root.model: Rectangle { height: 38px; border-radius: 5px;
+                        accessible-role: button; accessible-label: value;
+                        accessible-action-default => { root.pending=index; root.choose(); }
+                        background: hit.has-hover || root.pending == index ? Theme.selection : transparent;
+                        Text { x: 10px; width: parent.width - 20px; height: parent.height; text: value; color: Theme.text; vertical-alignment: center; overflow: elide; }
+                        hit := TouchArea { clicked => { root.pending=index; root.choose(); } }
+                    }
+                }
+            }
+        }
+    }
+}
+component ContentItem inherits Rectangle {
+    in property <ContentRow> item;
+    in property <bool> selected;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 92px; background: hit.has-hover ? Theme.hover : selected ? Theme.selection : Theme.control;
+    border-radius: 10px; border-width: field.has-focus && Theme.keyboard-focus ? 1px : 0px; border-color: Theme.focus;
+    accessible-role: button; accessible-label: item.title + " · " + item.description; accessible-enabled: enabled;
+    accessible-action-default => { if enabled { root.clicked(); } }
+    Rectangle { x: 12px; y: 18px; width: 48px; height: 48px; border-radius: 10px; background: Theme.selection;
+        if root.item.has-icon: Image { x: 4px; y: 4px; width: 40px; height: 40px; source: root.item.icon; image-fit: contain; }
+        if !root.item.has-icon: Text { text: root.item.initial; color: Theme.accent; font-size: 16px; font-weight: 600; overflow: elide; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    Text { x: 76px; y: 10px; width: parent.width - 96px; height: 22px; text: root.item.title; font-size: 16px; font-weight: 600; color: Theme.text; overflow: elide; }
+    Text { x: 76px; y: 35px; width: parent.width - 96px; height: 20px; text: root.item.description; font-size: 13px; color: Theme.secondary; overflow: elide; }
+    Text { x: 76px; y: 61px; width: parent.width - 96px; height: 18px; text: root.item.meta; font-size: 12px; color: Theme.accent; overflow: elide; }
+    field := FocusScope { enabled: root.enabled; key-pressed(e) => { if e.text == Key.Return || e.text == " " { root.clicked(); return accept; } return reject; } }
+    hit := TouchArea { enabled: root.enabled; clicked => { field.focus(); root.clicked(); } }
 }
 component InstanceIcon inherits Rectangle {
     in property <string> icon: "grass";
@@ -185,6 +265,9 @@ export component Launcher inherits Window {
     in-out property <int> java-download-index: 4;
     callback install-java();
     callback choose-account(int); callback choose-java(int); callback launch(); callback cancel(); callback open-folder();
+    in property <[string]> memory-options;
+    in-out property <int> memory-index: 2;
+    callback choose-memory(int);
     callback save-config(); callback open-eula(); callback launch-join();
     in-out property <int> network-tab: 0;
     in property <[string]> server-options; in-out property <int> server-index: -1;
@@ -239,7 +322,18 @@ export component Launcher inherits Window {
     in-out property <string> client-restore-name: "recovered-game";
     callback open-maintenance(); callback save-instance(); callback archive-instance();
     callback backup-instance(); callback restore-instance(); callback unarchive-instance();
-    in property <[string]> content-projects; in property <[string]> content-versions; in property <[string]> content-groups;
+    in property <[ContentRow]> content-projects; in property <[string]> content-versions; in property <[ContentRow]> content-groups;
+    in property <int> content-offset; in property <int> content-total;
+    in property <bool> content-loaded;
+    in-out property <int> content-sort: 0;
+    callback content-page(int); callback refresh-content();
+    in-out property <string> installed-query;
+    in-out property <int> installed-filter: 0;
+    in-out property <int> installed-page: 0;
+    in property <int> installed-total;
+    in property <string> installed-details;
+    callback filter-installed(); callback select-installed(int);
+    in-out property <string> content-project-title; in-out property <string> content-project-description;
     in property <[string]> content-group-states;
     in property <[OptionalRow]> content-optional;
     callback select-optional(int, bool);
@@ -317,8 +411,8 @@ export component Launcher inherits Window {
     if root.panel != 0: Rectangle {
         x: 0px; y: 0px; width: root.width; height: root.height; background: root.panel == 6 ? transparent : #07151b64;
         if root.panel != 6: TouchArea { }
-        Glass { x: root.panel == 6 ? 24px : (parent.width - self.width)/2; y: (root.panel == 6 ? 108px : (parent.height - self.height)/2); opacity: root.reveal; width: root.panel == 6 ? parent.width - 48px : min(root.panel == 8 ? 900px : 720px,parent.width - 80px);
-            height: root.panel == 6 ? parent.height - 132px : min(root.panel == 8 ? 680px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 10 ? 460px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 6 || root.panel == 8 ? 140px : 100px));
+        Glass { x: root.panel == 6 ? 24px : (parent.width - self.width)/2; y: (root.panel == 6 ? 108px : (parent.height - self.height)/2); opacity: root.reveal; width: root.panel == 6 ? parent.width - 48px : min(root.panel == 8 ? 1160px : 720px,parent.width - 80px);
+            height: root.panel == 6 ? parent.height - 132px : min(root.panel == 8 ? 900px : root.panel == 4 && root.install-step == 1 && root.loader-kind == "原版" ? 480px : root.panel == 3 ? 360px : root.panel == 10 ? 460px : root.panel == 7 ? 400px : root.panel == 1 && root.device-prompt == "" ? 366px : root.panel == 2 ? 600px : 640px, parent.height - (root.panel == 8 ? 100px : root.panel == 6 ? 140px : 100px));
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y; tint: Theme.dialog;
                     if root.panel == 6: VerticalLayout { x: 20px; y: 20px; width: 172px; height: root.height < 640px ? 300px : 356px; spacing: 8px;
                         Action { height: root.height < 640px ? 36px : 44px; leading: true; label: @tr("服务端"); selected: root.network-tab == 0; clicked => { root.network-tab=0; } }
@@ -331,7 +425,7 @@ export component Launcher inherits Window {
                     }
 
             ScrollView { x: root.panel == 6 ? 196px : 0px; width: min(parent.width - self.x, root.panel == 6 ? 1120px : parent.width); height: parent.height; content-width: self.width;
-            property <int> current-page: root.panel * 10 + (root.panel == 6 ? root.network-tab : 0);
+            property <int> current-page: root.panel * 10000 + (root.panel == 6 ? root.network-tab : root.panel == 8 ? root.content-tab * 1000 + root.content-step * 100 + root.content-offset + root.installed-page : 0);
             changed current-page => { self.content-y = 0px; }
             VerticalLayout { padding: root.height < 760px ? 24px : 32px; spacing: root.height < 760px ? 12px : 16px;
                 HorizontalLayout { height: 44px; spacing: 24px;
@@ -374,7 +468,7 @@ export component Launcher inherits Window {
                     }
                     Text { vertical-stretch: 0; text: @tr("Java 可执行文件（java.exe）"); color: Theme.text; }
                     LineEdit { height: 40px; text <=> root.java-path; enabled: !root.busy; accessible-label: @tr("Java 可执行文件"); }
-                    HorizontalLayout { spacing: 16px; height: 40px; Text { vertical-stretch: 0; vertical-alignment: center; text: @tr("最大内存（MiB）"); color: Theme.text; } SpinBox { value <=> root.memory-mib; minimum: 512; maximum: 65536; enabled: !root.busy; } }
+                    HorizontalLayout { spacing: 16px; height: 40px; Text { vertical-stretch: 0; vertical-alignment: center; text: @tr("最大内存（MiB）"); color: Theme.text; } ComboBox { model: root.memory-options; current-index <=> root.memory-index; enabled: !root.busy; selected(value) => { root.choose-memory(self.current-index); } } }
                     HorizontalLayout { height: 40px; spacing: 12px;
                         Button { text: @tr("打开游戏目录"); enabled: root.selected-id != ""; clicked => { root.open-folder(); } }
                         Button { text: @tr("模组与资源"); enabled: !root.busy && root.launch-candidate; clicked => { root.open-content(false); } }
@@ -555,9 +649,9 @@ export component Launcher inherits Window {
                         }
                         HorizontalLayout { height: 40px; spacing: 12px;
                             Text { text: @tr("难度"); color: Theme.secondary; vertical-alignment: center; }
-                            ComboBox { model: ["peaceful", "easy", "normal", "hard"]; current-value <=> root.server-difficulty; enabled: root.server-config-ready && !root.network-busy; }
+                            ComboBox { model: ["peaceful", "easy", "normal", "hard"]; current-index: root.server-difficulty == "peaceful" ? 0 : root.server-difficulty == "easy" ? 1 : root.server-difficulty == "normal" ? 2 : 3; selected(value) => { root.server-difficulty=value; } enabled: root.server-config-ready && !root.network-busy; }
                             Text { text: @tr("模式"); color: Theme.secondary; vertical-alignment: center; }
-                            ComboBox { model: ["survival", "creative", "adventure", "spectator"]; current-value <=> root.server-mode; enabled: root.server-config-ready && !root.network-busy; }
+                            ComboBox { model: ["survival", "creative", "adventure", "spectator"]; current-index: root.server-mode == "survival" ? 0 : root.server-mode == "creative" ? 1 : root.server-mode == "adventure" ? 2 : 3; selected(value) => { root.server-mode=value; } enabled: root.server-config-ready && !root.network-busy; }
                         }
                         Text { text: @tr("保存时检查外部修改，并保留恢复副本。若写入中断，先恢复配置再启动。"); color: Theme.secondary; wrap: word-wrap; vertical-stretch: 0; }
                         HorizontalLayout { height: 40px; spacing: 12px;
@@ -696,7 +790,7 @@ export component Launcher inherits Window {
                     if root.content-tab == 0 && root.content-step == 0: VerticalLayout { spacing: 10px;
                         HorizontalLayout { height: 40px; spacing: 12px;
                             ComboBox { width: 124px; model: [@tr("模组"), @tr("资源包"), @tr("光影"), @tr("插件")]; current-index <=> root.content-kind-index; enabled: !root.busy; selected(value) => { root.search-content(); } }
-                            LineEdit { text <=> root.content-query; placeholder-text: @tr("搜索 Modrinth"); accessible-label: @tr("搜索内容"); enabled: !root.busy; }
+                            LineEdit { text <=> root.content-query; accepted => { root.search-content(); } placeholder-text: @tr("搜索 Modrinth"); accessible-label: @tr("搜索内容"); enabled: !root.busy; }
                             Action { width: 80px; label: @tr("搜索"); enabled: !root.busy; clicked => { root.search-content(); } }
                         }
                         HorizontalLayout { height: 28px; spacing: 16px;
@@ -704,13 +798,36 @@ export component Launcher inherits Window {
                             CheckBox { text: @tr("匹配加载器"); checked <=> root.content-match-loader; enabled: !root.busy; toggled => { root.search-content(); } }
                             Text { text: @tr("安装前仍会核对兼容性"); color: Theme.secondary; font-size: 13px; vertical-alignment: center; }
                         }
-                        ScrollView { height: max(120px,min(168px,root.height - 618px));
-                            VerticalLayout { spacing: 6px;
-                                for project[index] in root.content-projects: Action { height: 38px; label: project; selected: root.content-project-index == index; enabled: !root.busy; clicked => { root.content-project-index=index; root.content-project(); } }
+                        HorizontalLayout { height: 36px; spacing: 12px;
+                            ComboBox { model: [@tr("相关程度"), @tr("最多下载"), @tr("最近更新"), @tr("最新发布")]; current-index <=> root.content-sort; enabled: !root.busy; selected(value) => { root.search-content(); } }
+                            Text { text: root.busy ? @tr("正在加载内容…") : root.content-total + @tr(" 个结果"); color: Theme.secondary; vertical-alignment: center; }
+                            Action { width: 100px; label: @tr("刷新列表"); enabled: !root.busy; clicked => { root.refresh-content(); } }
+                        }
+                        if !root.busy && root.content-loaded && root.content-projects.length == 0: Text { text: @tr("没有找到内容，请调整关键词或筛选条件。"); color: Theme.secondary; wrap: word-wrap; }
+                        ScrollView { height: max(190px,root.height - 420px); content-width: self.width;
+                            VerticalLayout { spacing: 8px;
+                                for project[index] in root.content-projects: ContentItem { item: project; enabled: !root.busy;
+                                    clicked => { root.content-project-index=index; root.content-project-title=project.title; root.content-project-description=project.description; root.content-step=2; root.content-project(); }
+                                }
                             }
                         }
-                        ComboBox { model: root.content-versions; current-index <=> root.content-version-index; enabled: !root.busy; }
-                        Action { height: 40px; label: @tr("预览版本与依赖"); selected: true; enabled: !root.busy && root.content-version-index >= 0 && root.content-version-index < root.content-versions.length; clicked => { root.preview-content(); } }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            Action { width: 110px; label: @tr("上一页"); enabled: !root.busy && root.content-offset > 0; clicked => { root.content-page(-1); } }
+                            Text { text: (floor(root.content-offset / 20) + 1) + " / " + max(1,ceil(root.content-total / 20)); color: Theme.secondary; horizontal-alignment: center; vertical-alignment: center; }
+                            Action { width: 110px; label: @tr("下一页"); enabled: !root.busy && root.content-offset + 20 < root.content-total && root.content-offset < 100000; clicked => { root.content-page(1); } }
+                        }
+                    }
+                    if root.content-tab == 0 && root.content-step == 2: VerticalLayout { spacing: 16px;
+                        Action { height: 36px; label: @tr("返回搜索结果"); clicked => { root.content-step=0; } }
+                        Text { text: root.content-project-title; color: Theme.text; font-size: 24px; font-weight: 600; wrap: word-wrap; }
+                        Text { text: root.content-project-description; color: Theme.secondary; wrap: word-wrap; }
+                        Text { text: root.busy ? @tr("正在读取兼容版本…") : @tr("选择版本"); color: Theme.accent; }
+                        ComboBox { height: 44px; model: root.content-versions; current-index <=> root.content-version-index; enabled: !root.busy; }
+                        if !root.busy && root.content-versions.length == 0: Text { text: @tr("没有匹配版本，可以返回调整筛选或重新加载。"); wrap: word-wrap; color: Theme.secondary; }
+                        HorizontalLayout { height: 44px; spacing: 12px;
+                            Action { label: @tr("重新加载版本"); enabled: !root.busy; clicked => { root.content-project(); } }
+                            Action { label: @tr("预览版本与依赖"); primary: true; enabled: !root.busy && root.content-version-index >= 0 && root.content-version-index < root.content-versions.length; clicked => { root.preview-content(); } }
+                        }
                     }
                     if root.content-tab == 0 && root.content-step == 1: VerticalLayout { spacing: 12px;
                         TextEdit { height: max(120px,min(200px,root.height - 510px)); text: root.content-preview; read-only: true; accessible-label: @tr("内容安装清单"); }
@@ -720,18 +837,34 @@ export component Launcher inherits Window {
                             }
                         }
                         HorizontalLayout { height: 40px; spacing: 12px;
-                            Action { label: @tr("返回选择"); enabled: !root.busy; clicked => { root.content-step=0; } }
+                            Action { label: @tr("返回选择"); enabled: !root.busy; clicked => { root.content-step=2; } }
                             Action { label: @tr("安装此清单"); selected: true; enabled: !root.busy && root.content-has-plan; clicked => { root.install-content(); } }
                         }
                     }
                     if root.content-tab == 1: VerticalLayout { spacing: 12px;
-                        ComboBox { model: root.content-groups; current-index <=> root.content-group-index; enabled: !root.busy; }
-                        Text { vertical-stretch: 0; text: @tr("按安装组管理；共享依赖会保留。被手动修改的文件会停止操作并保留。恢复不会覆盖其他文件。"); wrap: word-wrap; color: Theme.secondary; }
+                        HorizontalLayout { height: 40px; spacing: 12px;
+                            LineEdit { text <=> root.installed-query; placeholder-text: @tr("搜索已安装内容"); edited => { root.installed-page=0; root.filter-installed(); } }
+                            ComboBox { width: 160px; model: [@tr("全部状态"), @tr("已安装"), @tr("已移除，可恢复"), @tr("未完成")]; current-index <=> root.installed-filter; selected(value) => { root.installed-page=0; root.filter-installed(); } }
+                        }
+                        Text { text: root.installed-total + @tr(" 个安装组"); color: Theme.secondary; }
+                        if root.installed-total == 0: Text { text: @tr("还没有匹配的安装组。可以在查找内容中安装，或调整筛选。"); color: Theme.secondary; wrap: word-wrap; }
+                        ScrollView { height: max(150px,root.height - 540px); content-width: self.width;
+                            VerticalLayout { spacing: 8px;
+                                for group in root.content-groups: ContentItem { item: group; selected: root.content-group-index == group.index; enabled: !root.busy; clicked => { root.content-group-index=group.index; root.select-installed(group.index); } }
+                            }
+                        }
+                        HorizontalLayout { height: 36px; spacing: 12px;
+                            Action { width: 100px; label: @tr("上一页"); enabled: root.installed-page > 0; clicked => { root.installed-page -= 1; root.filter-installed(); } }
+                            Text { text: (root.installed-page + 1) + " / " + max(1,ceil(root.installed-total / 20)); color: Theme.secondary; horizontal-alignment: center; vertical-alignment: center; }
+                            Action { width: 100px; label: @tr("下一页"); enabled: (root.installed-page + 1)*20 < root.installed-total; clicked => { root.installed-page+=1; root.filter-installed(); } }
+                        }
+                        if root.content-group-index >= 0: TextEdit { height: 72px; text: root.installed-details; read-only: true; accessible-label: @tr("安装组文件详情"); }
                         HorizontalLayout { height: 40px; spacing: 12px;
                             Action { label: @tr("继续未完成安装"); enabled: !root.busy && root.content-group-index >= 0 && root.content-group-states[root.content-group-index] == "pending"; clicked => { root.change-content("resume"); } }
                             Action { label: @tr("移除（可恢复）"); enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "installed" || root.content-group-states[root.content-group-index] == "pending" || root.content-group-states[root.content-group-index] == "removing"); clicked => { root.change-content("remove"); } }
                             Action { label: @tr("恢复安装组"); enabled: !root.busy && root.content-group-index >= 0 && (root.content-group-states[root.content-group-index] == "removed" || root.content-group-states[root.content-group-index] == "restoring"); clicked => { root.change-content("restore"); } }
                         }
+                        Text { text: @tr("按安装组管理，共享依赖会保留。修改过的文件会保留并停止操作。"); color: Theme.secondary; wrap: word-wrap; font-size: 12px; }
                     }
                 }
                 if root.panel == 7: VerticalLayout { spacing: 12px;
@@ -756,7 +889,7 @@ export component Launcher inherits Window {
                     Text { text: @tr("外观会保存在 AmberL 中，下次打开自动恢复。账户和每个游戏的启动配置独立保存。"); color: Theme.secondary; wrap: word-wrap; }
                     Action { height: 44px; label: @tr("打开当前游戏配置"); clicked => { root.panel=2; } }
                 }
-                if root.panel != 11: Rectangle { vertical-stretch: 1; }
+                if root.panel != 11 && root.panel != 8: Rectangle { vertical-stretch: 1; }
                 if (root.panel == 6 && !root.busy ? root.network-help : root.status-help) != "": Text { text: root.panel == 6 && !root.busy ? root.network-help : root.status-help; color: Theme.accent; wrap: word-wrap; }
                 if root.panel != 5: HorizontalLayout { min-height: 44px; spacing: 12px;
                     Text { text: root.panel == 6 && !root.busy ? root.network-status : root.status; color: Theme.secondary; wrap: word-wrap; vertical-alignment: center; }

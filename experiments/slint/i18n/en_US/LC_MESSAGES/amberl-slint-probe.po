@@ -774,3 +774,66 @@ msgstr "Show details"
 
 msgid "任务详细记录"
 msgstr "Task details"
+
+msgid "相关程度"
+msgstr "Relevance"
+
+msgid "最多下载"
+msgstr "Most downloads"
+
+msgid "最近更新"
+msgstr "Recently updated"
+
+msgid "最新发布"
+msgstr "Newest"
+
+msgid "正在加载内容…"
+msgstr "Loading content…"
+
+msgid " 个结果"
+msgstr " results"
+
+msgid "刷新列表"
+msgstr "Refresh list"
+
+msgid "没有找到内容，请调整关键词或筛选条件。"
+msgstr "No results. Adjust the keywords or filters."
+
+msgid "上一页"
+msgstr "Previous"
+
+msgid "下一页"
+msgstr "Next"
+
+msgid "返回搜索结果"
+msgstr "Back to results"
+
+msgid "选择版本"
+msgstr "Choose version"
+
+msgid "没有匹配版本，可以返回调整筛选或重新加载。"
+msgstr "No matching versions. Adjust filters or reload."
+
+msgid "重新加载版本"
+msgstr "Reload versions"
+
+msgid "搜索已安装内容"
+msgstr "Search installed content"
+
+msgid "全部状态"
+msgstr "All states"
+
+msgid "未完成"
+msgstr "Incomplete"
+
+msgid " 个安装组"
+msgstr " installation groups"
+
+msgid "还没有匹配的安装组。可以在查找内容中安装，或调整筛选。"
+msgstr "No matching groups. Install content from Browse or adjust the filters."
+
+msgid "安装组文件详情"
+msgstr "Installation group files"
+
+msgid "按安装组管理，共享依赖会保留。修改过的文件会保留并停止操作。"
+msgstr "Manage installation groups. Shared dependencies are retained; modified files stop the operation and are preserved."

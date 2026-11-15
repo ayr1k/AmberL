@@ -39,3 +39,38 @@ Mojang runtime offered by that catalog, not a claim of a current Java 8 security
 
 Sources: [Modrinth API](https://docs.modrinth.com/api/operations/getversion/),
 [Mojang runtime catalog](https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json).
+
+## Content browser refinement / 内容浏览改进（待手动验收）
+
+Opening the content page starts its first search automatically. Vanilla targets
+start with resource packs, modded targets with mods, and Paper with plugins. A browse
+snapshot pins owned receipts/identity and verifies only the selected version metadata
+and identity receipt. It does not hash all assets or grant launch/write authority.
+Search/version browsing reuses this context; dependency planning and all mutations
+continue to revalidate the actual target independently. Refresh rebuilds the snapshot.
+
+Project results show title, summary, author and download count. Optional PNG icons
+load independently from the Modrinth CDN with four background workers, bounded bytes
+and image dimensions, and a letter fallback. Image failures do not block the list.
+No arbitrary image origins, credentials, redirects or executable content are used.
+
+Search supports relevance/downloads/updated/newest ordering, provider total counts
+and 20 results per page. Up to 16 pages are retained in memory for the current target;
+explicit refresh/search discards the page cache. Selecting a project opens a dedicated
+version section; the first matching version is selected automatically, and preview
+still checks actual compatibility. A list being visible is not installation authority.
+
+Installed content uses searchable 20-row pages with all/installed/removed/incomplete
+filters, state/file counts, file details and the existing resume/remove/restore actions.
+These remain managed installation groups, not an inventory of manually copied files.
+Shared dependencies and modified-file protections are preserved.
+
+All dropdowns now use the same glass-style control. Mouse selection leaves no focus
+outline; keyboard navigation keeps focus indication and supports arrows, Enter/Space,
+Escape and Tab. Memory is a preset list (including 1024/2048/4096/8192/16384 MiB);
+any valid existing nonpreset allocation is retained as an additional choice.
+
+本次修复首次不加载、浏览反复校验游戏导致等待、列表空间浪费和无翻页的问题。
+项目与已安装内容均提供列表、搜索/筛选与翻页，项目另有简介、作者、下载量和图标。
+内存改为常用值列表，下拉框鼠标点击后不保留亮色焦点框，键盘焦点仍可见。
+本候选仅编译打包，未运行功能测试、界面测试、网络请求验收或性能测量；由用户手测。

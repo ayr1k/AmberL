@@ -32,6 +32,9 @@ pub struct Project {
     pub id: String,
     pub title: String,
     pub description: String,
+    pub author: String,
+    pub downloads: u64,
+    pub icon_url: Option<String>,
 }
 #[derive(Clone, Debug)]
 pub struct Version {
@@ -165,6 +168,30 @@ pub fn search_with_filters(
     browse: Browse,
     c: &Cancellation,
 ) -> Result<Vec<Project>> {
+    Ok(search_page(query, kind, context, browse, 0, "relevance", c)?.projects)
+}
+pub const PAGE_SIZE: usize = 20;
+#[derive(Clone)]
+pub struct SearchPage {
+    pub projects: Vec<Project>,
+    pub total: usize,
+    pub offset: usize,
+}
+pub fn search_page(
+    query: &str,
+    kind: &str,
+    context: &Context,
+    browse: Browse,
+    offset: usize,
+    sort: &str,
+    c: &Cancellation,
+) -> Result<SearchPage> {
+    if offset > 100_000
+        || offset % PAGE_SIZE != 0
+        || !["relevance", "downloads", "updated", "newest"].contains(&sort)
+    {
+        return Err("Invalid content page or sort".into());
+    }
     if query.chars().count() > 128 || query.chars().any(char::is_control) {
         return Err("搜索文字过长".into());
     }
@@ -172,23 +199,36 @@ pub fn search_with_filters(
         .map_err(|e| e.to_string())?;
     let data = get(
         &format!(
-            "search?query={}&facets={}&limit=30",
+            "search?query={}&facets={}&limit={PAGE_SIZE}&offset={offset}&index={sort}",
             encoded(query),
             encoded(&f)
         ),
         c,
     )?;
     let rows = data["hits"].as_array().ok_or("Missing search results")?;
-    if rows.len() > 30 {
+    if rows.len() > PAGE_SIZE {
         return Err("Search result limit".into());
     }
-    rows.iter()
+    let projects = rows
+        .iter()
         .map(|v| {
             let project = text(v, "project_id")?;
             id(&project)?;
             Ok(Project {
                 id: project,
                 title: text(v, "title")?,
+                author: v["author"]
+                    .as_str()
+                    .unwrap_or("")
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(128)
+                    .collect(),
+                downloads: v["downloads"].as_u64().unwrap_or(0),
+                icon_url: v["icon_url"]
+                    .as_str()
+                    .filter(|u| u.starts_with("https://cdn.modrinth.com/data/") && u.len() < 2048)
+                    .map(str::to_owned),
                 description: v["description"]
                     .as_str()
                     .unwrap_or("")
@@ -198,7 +238,18 @@ pub fn search_with_filters(
                     .collect(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+    let total = data["total_hits"]
+        .as_u64()
+        .ok_or("Missing content result total")?;
+    if total > 10_000_000 {
+        return Err("Content result count exceeds limit".into());
+    }
+    Ok(SearchPage {
+        projects,
+        total: total as usize,
+        offset,
+    })
 }
 fn catalog(project: &str, kind: &str, context: &Context, c: &Cancellation) -> Result<Vec<Value>> {
     browse_catalog(project, kind, context, Browse::default(), c)

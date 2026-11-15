@@ -31,10 +31,17 @@ struct Lease {
     _server: Option<fs::File>,
 }
 fn lease(app: &Path, target: &Target, c: &Cancellation) -> Result<Lease> {
+    lease_for(app, target, c, false)
+}
+fn lease_for(app: &Path, target: &Target, c: &Cancellation, browse: bool) -> Result<Lease> {
     match target {
         Target::Client { root, version } => {
             crate::paths::name(version)?;
-            let mut client = Installed::open(root, c)?;
+            let mut client = if browse {
+                Installed::metadata(root, version, c)?
+            } else {
+                Installed::open(root, c)?
+            };
             crate::maintenance::ready(app, &client.root)?;
             let meta = client.json(&format!("versions/{version}/{version}.json"))?;
             if meta["id"] != version.as_str() {
@@ -137,16 +144,39 @@ fn validate(data: &Data) -> Result<()> {
     }
     Ok(())
 }
-pub fn list(app: &Path, target: &Target, c: &Cancellation) -> Result<Vec<Group>> {
-    let root = lease(app, target, c)?;
+/// A browse snapshot checks owned identity and metadata without hashing all assets.
+/// Install/change paths continue to acquire the full validated lease independently.
+pub fn snapshot(
+    app: &Path,
+    target: &Target,
+    c: &Cancellation,
+) -> Result<(modrinth::Context, Vec<Group>)> {
+    let root = lease_for(app, target, c, true)?;
     let doc = Document::<Data>::open(app, "content-v1.json")?;
     validate(&doc.data)?;
-    Ok(doc
-        .data
-        .groups
-        .into_iter()
-        .filter(|g| g.object == root.root.id)
-        .collect())
+    Ok((
+        root.context,
+        doc.data
+            .groups
+            .into_iter()
+            .filter(|g| g.object == root.root.id)
+            .collect(),
+    ))
+}
+pub fn list(app: &Path, target: &Target, c: &Cancellation) -> Result<Vec<Group>> {
+    Ok(snapshot(app, target, c)?.1)
+}
+impl Group {
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+    pub fn details(&self) -> String {
+        self.files
+            .iter()
+            .map(|f| format!("{} · {}", f.title, f.path))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 fn pinned(path: &Path, f: &modrinth::File, c: &Cancellation) -> Result<fs::File> {
     let mut file = options()

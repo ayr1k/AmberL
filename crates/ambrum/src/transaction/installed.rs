@@ -12,6 +12,19 @@ pub(crate) struct Installed {
 }
 impl Installed {
     pub(crate) fn open(path: &Path, cancel: &Cancellation) -> Result<Self> {
+        Self::open_selected(path, cancel, None)
+    }
+    /// Browse only: pin receipts/identity and verify the requested metadata file.
+    /// This is never sufficient authority to launch or mutate an installation.
+    pub(crate) fn metadata(path: &Path, version: &str, cancel: &Cancellation) -> Result<Self> {
+        crate::paths::name(version)?;
+        Self::open_selected(
+            path,
+            cancel,
+            Some(&format!("versions/{version}/{version}.json")),
+        )
+    }
+    fn open_selected(path: &Path, cancel: &Cancellation, metadata: Option<&str>) -> Result<Self> {
         let root = DirectoryGuard::open(path)?;
         let parent = DirectoryGuard::open(root.root.parent().ok_or("Missing instance parent")?)?;
         // Pin journals before decoding so replacing them cannot change the checked identity.
@@ -68,7 +81,10 @@ impl Installed {
             {
                 return Err("Invalid installed resource record".into());
             }
-            if record.mutable {
+            if record.mutable
+                || metadata
+                    .is_some_and(|selected| selected != record.path && record.path != PENDING)
+            {
                 continue;
             }
             if let Some((parent, _)) = record.path.rsplit_once('/')
