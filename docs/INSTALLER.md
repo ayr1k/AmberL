@@ -34,3 +34,19 @@ Windows system DLLs and graphics drivers remain OS prerequisites.
 
 测试包随应用携带官方签名的 Visual C++ 运行库，并纳入校验清单；不修改系统运行库。
 已确认实际从应用目录加载。干净系统和其他显卡的验收仍需独立记录。
+
+## Default game locations / 默认游戏位置
+
+The installer creates `AMBER原生` and `.minecraft` beside `amberl.exe`. First launch
+registers these locations, and portable launches create them if writable. Each game
+still gets its own new named installation under the selected location; `.minecraft`
+here is a container, not a promise to share one versions/assets directory. Uninstall
+preserves these folders and their contents.
+
+安装页通过列表选择这两个目录或已添加的位置。使用“添加游戏库”可以登记其他已有
+文件夹；识别到的已有游戏库仍可扫描。新游戏使用独立目录，不覆盖旧游戏。已有目录
+如果包含 versions/instances/saves/libraries 等游戏内容，安装位置显示为其中的
+`AmberL` 子目录，只有开始安装时才创建该子目录。目录不可写时可以添加其他位置。
+
+This candidate's folder creation, upgrade and uninstall behavior has **not** been
+executed or tested, per the user's manual-acceptance instruction.

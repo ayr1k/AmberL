@@ -1,4 +1,4 @@
-name: Verify and package development probe
+name: Build and package development probe
 on:
   push:
   pull_request:
@@ -11,21 +11,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      # A user-requested manual-only candidate builds packages without running tests.
+      # Ordinary commits retain the existing verification steps.
+      - name: Read candidate verification mode
+        shell: pwsh
+        run: |
+          $manual = (git log -1 --format=%B) -contains '[manual-test-only]'
+          "AMBERL_MANUAL_TEST_ONLY=$($manual.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+          if ($manual) { 'User-requested build-only candidate. Tests and application launch were NOT run; manual acceptance pending.' >> $env:GITHUB_STEP_SUMMARY }
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - run: rustup component add rust-docs
       - run: cargo fmt --all --check
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
       - run: cargo test --workspace --locked
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
       - run: cargo build --workspace --release --locked
       - shell: pwsh
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
         run: ./scripts/test-native-probe.ps1
       - shell: pwsh
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
         run: ./scripts/test-resource-plan.ps1
       - shell: pwsh
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
         run: ./scripts/test-install.ps1
       - shell: pwsh
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
         run: ./scripts/test-launch-boundaries.ps1
       - shell: pwsh
         run: ./scripts/package-probe.ps1
@@ -40,12 +55,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      # A user-requested manual-only candidate builds packages without running tests.
+      # Ordinary commits retain the existing verification steps.
+      - name: Read candidate verification mode
+        shell: pwsh
+        run: |
+          $manual = (git log -1 --format=%B) -contains '[manual-test-only]'
+          "AMBERL_MANUAL_TEST_ONLY=$($manual.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+          if ($manual) { 'User-requested build-only candidate. Tests and application launch were NOT run; manual acceptance pending.' >> $env:GITHUB_STEP_SUMMARY }
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - run: rustup component add rust-docs
       - run: cargo fmt --manifest-path experiments/slint/Cargo.toml --check
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
       - run: cargo clippy --manifest-path experiments/slint/Cargo.toml --all-targets --locked -- -D warnings
+        if: env.AMBERL_MANUAL_TEST_ONLY != 'true'
         env:
           SLINT_STYLE: fluent
       - shell: pwsh

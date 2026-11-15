@@ -723,3 +723,54 @@ msgstr "Check stable releases"
 
 msgid "打开官方下载页"
 msgstr "Open official download page"
+
+msgid "取消登录"
+msgstr "Cancel sign-in"
+
+msgid "复制设备码"
+msgstr "Copy device code"
+
+msgid "剩余时间（秒）："
+msgstr "Seconds remaining: "
+
+msgid "未完成网页授权不会登录成功。你可以取消，或继续使用启动器的其他功能。"
+msgstr "Sign-in waits for web authorization. You can cancel or continue using other launcher features."
+
+msgid "填写一个已有文件夹，将它加入安装位置列表。已有游戏库还会登记并扫描；原文件不会移动或覆盖。"
+msgstr "Enter an existing folder to add an installation location. Existing game libraries are also registered and scanned; original files are not moved or overwritten."
+
+msgid "安装位置"
+msgstr "Install location"
+
+msgid "添加安装位置或游戏库"
+msgstr "Add location or library"
+
+msgid "微软登录"
+msgstr "Microsoft sign-in"
+
+msgid "继续网页授权"
+msgstr "Continue sign-in"
+
+msgid "暂无下载或游戏任务"
+msgstr "No download or game tasks"
+
+msgid "已完成"
+msgstr "Completed"
+
+msgid "已取消"
+msgstr "Cancelled"
+
+msgid "你可以安装游戏、管理内容，或前往联机。"
+msgstr "Install a game, manage content, or open Multiplayer."
+
+msgid "取消运行中的游戏会请求正常退出，请先保存世界。"
+msgstr "Cancelling a running game requests a normal exit. Save your world first."
+
+msgid "收起详细记录"
+msgstr "Hide details"
+
+msgid "查看详细记录"
+msgstr "Show details"
+
+msgid "任务详细记录"
+msgstr "Task details"

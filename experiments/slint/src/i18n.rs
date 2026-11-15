@@ -5,6 +5,33 @@ pub fn text(english: bool, value: &str) -> &str {
         return value;
     }
     match value {
+        "设备码已复制" => "Device code copied",
+        "复制失败，请点击复制设备码重试" => {
+            "Copy failed. Use Copy device code to retry."
+        }
+        "正在取消登录…" => "Cancelling sign-in…",
+        "正在获取微软设备码…" => "Requesting a Microsoft device code…",
+        "等待你在微软网页完成授权，可随时取消" => {
+            "Waiting for Microsoft web authorization. You can cancel at any time."
+        }
+        "登录已取消" => "Sign-in cancelled",
+        "微软账户已添加" => "Microsoft account added",
+        "登录任务已断开，请重试" => "Sign-in task disconnected. Please retry.",
+        "请先完成或取消登录" => "Finish or cancel sign-in first",
+        "刷新游戏库" => "Refreshing libraries",
+        "添加游戏库" => "Adding library",
+        "读取游戏版本" => "Loading game versions",
+        "读取组件版本" => "Loading component versions",
+        "查找 Java" => "Finding Java",
+        "下载 Java" => "Downloading Java",
+        "微软登录" => "Microsoft sign-in",
+        "退出账户" => "Signing out",
+        "启动游戏" => "Starting game",
+        "安装游戏" => "Installing game",
+        "创建游戏副本" => "Creating game copy",
+        "管理实例与备份" => "Managing instances and backups",
+        "管理游戏内容" => "Managing game content",
+        "检查正式版本" => "Checking stable releases",
         "暂无可用的新正式版本" => "No newer stable release is available",
         "仅手动检查 AmberL 官方正式版本；不会自动下载或安装。" => {
             "Checks official AmberL stable releases on request. No automatic download or installation."

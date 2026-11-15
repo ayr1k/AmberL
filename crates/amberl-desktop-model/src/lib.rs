@@ -76,6 +76,8 @@ impl LaunchChoice {
     }
 }
 enum Message {
+    Locations(Vec<ambrum::locations::Location>),
+    Accounts(Vec<Profile>),
     Update(Option<ambrum::updates::Release>),
     Maintenance(maintenance::Response),
     Content(content::Response),
@@ -83,12 +85,13 @@ enum Message {
     Java(Vec<Candidate>),
     Catalog(Vec<ambrum::catalog::Version>),
     Loaders(String, String, Vec<String>),
-    Prompt(String),
+    Prompt(String, String, u64),
     Status(String),
     Started,
     Finished(Result<()>),
 }
 enum Operation {
+    Initialize(PathBuf),
     CheckUpdate,
     Import(import::Request),
     Maintenance(maintenance::Request),
@@ -103,6 +106,7 @@ enum Operation {
     Forget(String),
     Launch(LaunchChoice),
     Install {
+        location: Option<ambrum::locations::Location>,
         version: String,
         parent: PathBuf,
         name: String,
@@ -123,6 +127,8 @@ pub struct Model {
     app: PathBuf,
     pub games: Vec<Game>,
     pub accounts: Vec<Profile>,
+    pub locations: Vec<ambrum::locations::Location>,
+    pub preferred_account: Option<String>,
     pub java: Vec<Candidate>,
     pub catalog: Vec<ambrum::catalog::Version>,
     pub loaders: Vec<String>,
@@ -133,6 +139,11 @@ pub struct Model {
     pub update_checked: bool,
     pub update: Option<ambrum::updates::Release>,
     pub device_prompt: String,
+    pub device_code: String,
+    pub login_status: String,
+    login_deadline: Option<Instant>,
+    pub task_title: String,
+    pub task_state: i32,
     pub revision: u64,
     pub data_revision: u64,
     pub java_revision: u64,
@@ -142,6 +153,7 @@ pub struct Model {
     pub maintenance: maintenance::Maintenance,
     pub preferences: std::collections::BTreeMap<String, ambrum::preferences::Launch>,
     worker: Option<Worker>,
+    login_worker: Option<Worker>,
     log: VecDeque<String>,
 }
 impl Model {
@@ -158,6 +170,8 @@ impl Model {
         let saved = ambrum::preferences::load(&app);
         let (selected, preferences) = saved.as_ref().cloned().unwrap_or_default();
         Self {
+            preferred_account: ambrum::preferences::account(&app).unwrap_or_default(),
+            locations: vec![],
             network: network::Network::new(app.clone()),
             content: content::Content::default(),
             maintenance: maintenance::Maintenance::default(),
@@ -175,16 +189,44 @@ impl Model {
             update_checked: false,
             update: None,
             device_prompt: String::new(),
+            device_code: String::new(),
+            login_status: String::new(),
+            login_deadline: None,
+            task_title: String::new(),
+            task_state: 0,
             revision: 1,
             data_revision: 1,
             java_revision: 1,
             running: false,
             worker: None,
+            login_worker: None,
             log: VecDeque::new(),
         }
     }
     pub fn busy(&self) -> bool {
         self.worker.is_some()
+    }
+    pub fn login_active(&self) -> bool {
+        self.login_worker.is_some()
+    }
+    pub fn login_remaining(&self) -> i32 {
+        self.login_deadline.map_or(0, |d| {
+            d.saturating_duration_since(Instant::now()).as_secs() as i32
+        })
+    }
+    pub fn choose_account(&mut self, account: Option<String>) -> Result<()> {
+        if account
+            .as_ref()
+            .is_some_and(|id| !self.accounts.iter().any(|a| &a.id == id))
+        {
+            return Err("账户选择已失效".into());
+        }
+        ambrum::preferences::save_account(&self.app, account.clone())?;
+        self.preferred_account = account;
+        Ok(())
+    }
+    pub fn initialize(&mut self, root: PathBuf) -> Result<()> {
+        self.start(Operation::Initialize(root))
     }
     pub fn save_preferences(&mut self, preference: ambrum::preferences::Launch) -> Result<()> {
         let id = self.selected_game().ok_or("请先选择游戏")?.id.clone();
@@ -249,6 +291,9 @@ impl Model {
         self.start(Operation::Login)
     }
     pub fn forget(&mut self, id: String) -> Result<()> {
+        if self.login_active() {
+            return Err("请先完成或取消登录".into());
+        }
         if !self.accounts.iter().any(|a| a.id == id) {
             return Err("请先选择要退出的账户".into());
         }
@@ -308,6 +353,11 @@ impl Model {
             return Err("请选择 1–128 GiB 的安装预算，并确认 Windows 版本".into());
         }
         self.start(Operation::Install {
+            location: self
+                .locations
+                .iter()
+                .find(|l| l.destination() == parent)
+                .cloned(),
             version,
             parent,
             name,
@@ -332,10 +382,42 @@ impl Model {
             );
         }
     }
+    pub fn cancel_login(&mut self) {
+        if let Some(worker) = &self.login_worker {
+            worker.cancel.cancel();
+            self.device_code.clear();
+            self.device_prompt.clear();
+            self.login_deadline = None;
+            self.login_status = "正在取消登录…".into();
+            self.revision += 1;
+        }
+    }
     fn start(&mut self, operation: Operation) -> Result<()> {
-        if self.busy() {
+        let login = matches!(operation, Operation::Login);
+        if if login {
+            self.login_active()
+        } else {
+            self.busy()
+        } {
             return Err("已有操作正在进行，请等待或取消".into());
         }
+        let title = match &operation {
+            Operation::Initialize(_) | Operation::Reload => "刷新游戏库",
+            Operation::Attach(_) => "添加游戏库",
+            Operation::Catalog => "读取游戏版本",
+            Operation::Loaders(..) => "读取组件版本",
+            Operation::Java => "查找 Java",
+            Operation::InstallJava(_) => "下载 Java",
+            Operation::Login => "微软登录",
+            Operation::Forget(_) => "退出账户",
+            Operation::Launch(_) => "启动游戏",
+            Operation::Install { .. } => "安装游戏",
+            Operation::Import(_) => "创建游戏副本",
+            Operation::Maintenance(_) => "管理实例与备份",
+            Operation::Content(_) => "管理游戏内容",
+            Operation::CheckUpdate => "检查正式版本",
+        }
+        .to_owned();
         let app = self.app.clone();
         let cancel = Cancellation::default();
         let token = cancel.clone();
@@ -350,14 +432,25 @@ impl Model {
                 let _ = sender.send(Message::Finished(result));
             })
             .map_err(|_| "无法创建后台任务")?;
-        self.worker = Some(Worker {
+        let worker = Some(Worker {
             cancel,
             receiver,
             handle,
         });
-        self.running = false;
-        self.device_prompt.clear();
-        self.report("正在处理…".into());
+        if login {
+            self.login_worker = worker;
+            self.device_prompt.clear();
+            self.device_code.clear();
+            self.login_deadline = None;
+            self.login_status = "正在获取微软设备码…".into();
+            self.revision += 1;
+        } else {
+            self.worker = worker;
+            self.running = false;
+            self.task_title = title.clone();
+            self.task_state = 1;
+            self.report(title);
+        }
         Ok(())
     }
     pub fn tick(&mut self) {
@@ -366,19 +459,50 @@ impl Model {
         if previous != self.network.revision {
             self.revision += 1;
         }
+        self.tick_worker(false);
+        self.tick_worker(true);
+    }
+    fn tick_worker(&mut self, login: bool) {
         let mut finished = false;
         for _ in 0..32 {
-            let Some(worker) = &self.worker else { break };
+            let Some(worker) = (if login {
+                &self.login_worker
+            } else {
+                &self.worker
+            }) else {
+                break;
+            };
             let message = match worker.receiver.try_recv() {
                 Ok(message) => message,
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => {
-                    self.report("后台任务已断开".into());
+                    if login {
+                        self.login_status = "登录任务已断开，请重试".into();
+                    } else {
+                        self.task_state = 3;
+                        self.report("后台任务已断开".into());
+                    }
                     finished = true;
                     break;
                 }
             };
             match message {
+                Message::Locations(locations) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.locations = locations;
+                    self.data_revision += 1;
+                    self.revision += 1;
+                }
+                Message::Accounts(accounts) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.accounts = accounts;
+                    self.data_revision += 1;
+                    self.revision += 1;
+                }
                 Message::Update(release) => {
                     if worker.cancel.check().is_err() {
                         continue;
@@ -449,11 +573,14 @@ impl Model {
                     self.catalog_revision += 1;
                     self.revision += 1;
                 }
-                Message::Prompt(prompt) => {
+                Message::Prompt(prompt, code, seconds) => {
                     if worker.cancel.check().is_err() {
                         continue;
                     }
                     self.device_prompt = prompt;
+                    self.device_code = code;
+                    self.login_deadline = Some(Instant::now() + Duration::from_secs(seconds));
+                    self.login_status = "等待你在微软网页完成授权，可随时取消".into();
                     self.revision += 1;
                 }
                 Message::Status(status) => self.report(status),
@@ -462,21 +589,50 @@ impl Model {
                     self.revision += 1;
                 }
                 Message::Finished(result) => {
-                    self.report(match result {
-                        Ok(()) => String::new(),
-                        Err(error) => error,
-                    });
+                    let cancelled = worker.cancel.check().is_err();
+                    if login {
+                        self.login_status = if cancelled {
+                            "登录已取消".into()
+                        } else {
+                            match result {
+                                Ok(()) => "微软账户已添加".into(),
+                                Err(error) => error,
+                            }
+                        };
+                        self.revision += 1;
+                    } else {
+                        self.task_state = if cancelled {
+                            4
+                        } else if result.is_ok() {
+                            2
+                        } else {
+                            3
+                        };
+                        self.report(match result {
+                            Ok(()) => String::new(),
+                            Err(error) => error,
+                        });
+                    }
                     finished = true;
                     break;
                 }
             }
         }
         if finished {
-            if let Some(worker) = self.worker.take() {
+            if let Some(worker) = if login {
+                self.login_worker.take()
+            } else {
+                self.worker.take()
+            } {
                 let _ = worker.handle.join();
             }
-            self.running = false;
-            self.device_prompt.clear();
+            if login {
+                self.device_prompt.clear();
+                self.device_code.clear();
+                self.login_deadline = None;
+            } else {
+                self.running = false;
+            }
             self.revision += 1;
         }
     }
@@ -484,6 +640,9 @@ impl Model {
 impl Drop for Model {
     fn drop(&mut self) {
         if let Some(worker) = &self.worker {
+            worker.cancel.cancel();
+        }
+        if let Some(worker) = &self.login_worker {
             worker.cancel.cancel();
         }
     }
@@ -498,6 +657,14 @@ fn reload(
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
     let registry = Registry::open(app)?;
+    for entry in registry
+        .entries()
+        .iter()
+        .filter(|e| !e.path.join("installation.ready.json").is_file())
+    {
+        let _ = ambrum::locations::add(app, &entry.path);
+    }
+    send(sender, Message::Locations(ambrum::locations::list(app)?))?;
     let mut games = Vec::new();
     let profiles = ambrum::maintenance::profiles(app)?;
     if registry.entries().len() > 64 {
@@ -611,6 +778,11 @@ fn execute(
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
     match operation {
+        Operation::Initialize(root) => {
+            let result = ambrum::locations::defaults(app, &root);
+            reload(app, cancel, sender)?;
+            result
+        }
         Operation::CheckUpdate => {
             send(sender, Message::Status("正在检查 AmberL 正式版本…".into()))?;
             send(
@@ -631,7 +803,10 @@ fn execute(
             send(sender, Message::Loaders(game, kind, versions))
         }
         Operation::Attach(path) => {
-            Registry::open(app)?.attach(&path)?;
+            ambrum::locations::add(app, &path)?;
+            if ambrum::library::Library::open(&path).is_ok() {
+                Registry::open(app)?.attach(&path)?;
+            }
             reload(app, cancel, sender)
         }
         Operation::Content(request) => content::execute(app, request, cancel, sender),
@@ -661,12 +836,16 @@ fn execute(
             let prompt = flow.prompt();
             send(
                 sender,
-                Message::Prompt(format!(
-                    "在微软官方页面输入设备码：\n{}\n{}\n有效期 {} 分钟；请勿将密码或验证码发送给他人。",
-                    prompt.user_code,
-                    prompt.verification_uri,
-                    prompt.expires_in / 60
-                )),
+                Message::Prompt(
+                    format!(
+                        "在微软官方页面输入设备码：\n{}\n{}\n有效期 {} 分钟；请勿将密码或验证码发送给他人。",
+                        prompt.user_code,
+                        prompt.verification_uri,
+                        prompt.expires_in / 60
+                    ),
+                    prompt.user_code.clone(),
+                    prompt.expires_in,
+                ),
             )?;
             loop {
                 match flow.poll(&ambrum::auth::http::Https, cancel)? {
@@ -678,7 +857,7 @@ fn execute(
                     }
                 }
             }
-            reload(app, cancel, sender)
+            send(sender, Message::Accounts(Store::open(app)?.profiles()))
         }
         Operation::Launch(choice) => {
             let registry = Registry::open(app)?;
@@ -724,6 +903,7 @@ fn execute(
             }
         }
         Operation::Install {
+            location,
             version,
             parent,
             name,
@@ -734,6 +914,8 @@ fn execute(
             loader,
             java,
         } => {
+            let held = location.as_ref().map(|l| l.prepare(app)).transpose()?;
+            let parent = held.as_ref().map_or(parent, |l| l.path.clone());
             ambrum::install::check_destination(app, &parent, &name)?;
             let cache = Cache::open(app)?;
             let resolved =
@@ -903,7 +1085,11 @@ mod tests {
         let (sender, receiver) = mpsc::sync_channel(32);
         sender.send(Message::Data(vec![], vec![])).unwrap();
         sender
-            .send(Message::Prompt("private-device-code".into()))
+            .send(Message::Prompt(
+                "private-device-code".into(),
+                "private-device-code".into(),
+                900,
+            ))
             .unwrap();
         sender
             .send(Message::Finished(Err("Cancelled".into())))

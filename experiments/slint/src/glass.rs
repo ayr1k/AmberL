@@ -65,10 +65,22 @@ impl Glass {
         }
         let mut tile = imageops::crop_imm(&self.viewport, x, y, w, h).to_image();
         let radius = (15.0 * scale).min(w as f32 / 2.0).min(h as f32 / 2.0);
-        for (px, py, pixel) in tile.enumerate_pixels_mut() {
-            let dx = (radius - (px as f32 + 0.5).min(w as f32 - px as f32 - 0.5)).max(0.0);
-            let dy = (radius - (py as f32 + 0.5).min(h as f32 - py as f32 - 0.5)).max(0.0);
-            pixel[3] = ((radius + 0.5 - dx.hypot(dy)).clamp(0.0, 1.0) * 255.0).round() as u8;
+        // Only the four corners need an alpha mask. Leave the opaque interior intact.
+        let corner = radius.ceil() as u32;
+        for cy in 0..corner {
+            for cx in 0..corner {
+                let dx = (radius - cx as f32 - 0.5).max(0.0);
+                let dy = (radius - cy as f32 - 0.5).max(0.0);
+                let alpha = ((radius + 0.5 - dx.hypot(dy)).clamp(0.0, 1.0) * 255.0).round() as u8;
+                for (px, py) in [
+                    (cx, cy),
+                    (w - 1 - cx, cy),
+                    (cx, h - 1 - cy),
+                    (w - 1 - cx, h - 1 - cy),
+                ] {
+                    tile.get_pixel_mut(px, py)[3] = alpha;
+                }
+            }
         }
         let image = Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
             tile.as_raw(),

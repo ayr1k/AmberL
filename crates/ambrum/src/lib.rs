@@ -20,6 +20,8 @@ pub mod library;
 #[cfg(windows)]
 pub mod loader;
 #[cfg(windows)]
+pub mod locations;
+#[cfg(windows)]
 pub mod maintenance;
 #[cfg(windows)]
 pub mod manifest;

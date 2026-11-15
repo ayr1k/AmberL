@@ -98,6 +98,30 @@ pub fn appearance(app: &Path) -> Result<Appearance> {
     Ok(Document::<Appearance>::open(app, "appearance-v1.json")?.data)
 }
 
+#[derive(Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AccountChoice {
+    account: Option<String>,
+}
+pub fn account(app: &Path) -> Result<Option<String>> {
+    Ok(
+        Document::<AccountChoice>::open(app, "account-choice-v1.json")?
+            .data
+            .account,
+    )
+}
+pub fn save_account(app: &Path, account: Option<String>) -> Result<()> {
+    if account
+        .as_ref()
+        .is_some_and(|s| s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        return Err("无效账户标识".into());
+    }
+    let mut doc = Document::<AccountChoice>::open(app, "account-choice-v1.json")?;
+    doc.data.account = account;
+    doc.save()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

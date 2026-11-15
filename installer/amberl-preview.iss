@@ -31,6 +31,9 @@ VersionInfoVersion=0.1.0.0
 VersionInfoDescription=AmberL development test installer
 SetupLogging=yes
 DisableProgramGroupPage=yes
+[Dirs]
+Name: "{app}\AMBER原生"; Flags: uninsneveruninstall
+Name: "{app}\.minecraft"; Flags: uninsneveruninstall
 [Files]
 Source: "{#PackageRoot}\launcher\amberl.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\launcher\*.dll"; DestDir: "{app}"; Flags: ignoreversion

@@ -164,3 +164,23 @@ Common network, Java, account, checksum, space and destination-conflict diagnost
 include Chinese/English next-step guidance. Original diagnostics remain visible;
 retry is explicit and existing identity/integrity checks still run. No generic idle
 “operation complete” message is restored.
+
+## Manual-acceptance candidate: sign-in and resize refinement
+
+Saved valid game account choice, then global account choice, then the first stored
+Microsoft profile is selected automatically. This does not sign in to a new account
+or copy credentials. Explicit account selection saves the global preference.
+Microsoft device authorization has its own worker, deadline and cancel action;
+waiting for the official page no longer holds the download/game worker busy.
+The account page copies the requested device code once, reports clipboard failure,
+and allows retry. Device codes are not written to logs or settings.
+
+Tasks show the operation title, state, relevant cancel action and collapsible details.
+Mouse clicks no longer leave a keyboard-focus outline; keyboard navigation keeps it.
+Glass geometry settles for 140 ms before regenerating cached textures; during edge
+resizing the last texture stretches with the panel. Final texture quality is retained.
+These changes are implemented and built only: no UI, login or performance testing
+was run for this revision at the user's request.
+
+账户自动选择、安装位置列表、登录取消与设备码复制、任务页和缩放优化待手动验收。
+此前 DPI/界面测试记录仅适用于其标注的旧版本，不证明本次体验已通过。

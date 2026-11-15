@@ -1,5 +1,24 @@
 # First-version completion ledger / 首版完成清单
 
+
+## Current candidate: user-requested manual acceptance only
+
+Latest instruction supersedes the automated-verification direction below: **do not
+run tests after this update; the user will test manually**. This candidate is built
+and packaged only. No automated tests, application launch, installer execution,
+login, game, UI or resize-performance acceptance is claimed for these changes.
+Earlier evidence below belongs to earlier revisions, most recently `974d3d6a`.
+The exact candidate revision is recorded in each package's TEST-REVISION.txt and PR.
+
+本次按用户要求只编译、打包，不运行测试或启动程序。以下改动均待用户手动验收，
+不能沿用旧版本的通过记录：默认游戏目录与安装列表、账户自动选择、独立可取消的
+微软登录、设备码自动复制、任务页、鼠标焦点边框和窗口缩放纹理更新。
+
+The CI commit trailer `[manual-test-only]` selects build/package-only delivery for
+this candidate. Verification steps are visibly skipped and the job summary records
+that no tests ran. Ordinary commits without that trailer retain existing checks.
+No merge, stable Release or website publication is authorized.
+
 User direction, 2026-11-14: continue until the first version is complete, including
 multiplayer. This ledger tracks the full PLAN.md contract; an implementation check
 is not user acceptance or authorization to merge/publish. Baseline: `452c161`.

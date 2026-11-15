@@ -5,6 +5,8 @@ use slint::Model as _;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
+#[path = "../clipboard.rs"]
+mod clipboard;
 #[path = "../diagnostics.rs"]
 mod diagnostics;
 #[path = "../glass.rs"]
@@ -37,6 +39,7 @@ struct View {
     configuration_key: (String, String),
     configuration_revision: u64,
     frp_revision: u64,
+    copied_device_code: String,
 }
 fn strings(values: Vec<String>) -> ModelRc<SharedString> {
     ModelRc::new(VecModel::from(
@@ -69,6 +72,7 @@ fn filter_versions(ui: &Launcher, model: &Model) {
 fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     let english = ui.global::<Locale>().get_english();
     let tr = |value: &str| -> SharedString { i18n::message(english, value).into() };
+    ui.set_login_remaining(model.login_remaining());
     if view.revision == model.revision && view.network_revision == model.network.revision {
         return;
     }
@@ -321,10 +325,35 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         let index = view
             .account
             .as_ref()
-            .and_then(|id| model.accounts.iter().position(|a| &a.id == id));
-        if index.is_none() {
-            view.account = None;
-        }
+            .and_then(|id| model.accounts.iter().position(|a| &a.id == id))
+            .or_else(|| {
+                model
+                    .preferred_account
+                    .as_ref()
+                    .and_then(|id| model.accounts.iter().position(|a| &a.id == id))
+            })
+            .or_else(|| (!model.accounts.is_empty()).then_some(0));
+        view.account = index.map(|i| model.accounts[i].id.clone());
+        let location = model
+            .locations
+            .iter()
+            .position(|l| l.destination() == PathBuf::from(ui.get_install_parent().as_str()))
+            .or_else(|| (!model.locations.is_empty()).then_some(0));
+        ui.set_install_locations(strings(
+            model
+                .locations
+                .iter()
+                .map(|l| l.destination().display().to_string())
+                .collect(),
+        ));
+        ui.set_install_location_index(location.map_or(-1, |i| i as i32));
+        ui.set_install_parent(
+            location
+                .map_or_else(String::new, |i| {
+                    model.locations[i].destination().display().to_string()
+                })
+                .into(),
+        );
         let mut accounts = vec![i18n::text(english, "选择账户").into()];
         accounts.extend(model.accounts.iter().map(|a| a.name.clone()));
         ui.set_account_options(strings(accounts));
@@ -435,8 +464,27 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
         .into(),
     });
     ui.set_task_log(model.log().into());
+    ui.set_task_title(tr(&model.task_title));
+    ui.set_task_state(model.task_state);
+    ui.set_login_active(model.login_active());
+    ui.set_login_status(tr(&model.login_status));
+    ui.set_device_code(model.device_code.as_str().into());
+    if model.device_code != view.copied_device_code {
+        if !model.device_code.is_empty() {
+            copy_device_code(ui, &model.device_code);
+        }
+        view.copied_device_code = model.device_code.clone();
+    }
     ui.set_device_prompt(i18n::device_prompt(english, &model.device_prompt).into());
     view.revision = model.revision;
+}
+fn copy_device_code(ui: &Launcher, code: &str) {
+    let notice = if clipboard::copy(ui.window(), code) {
+        "设备码已复制"
+    } else {
+        "复制失败，请点击复制设备码重试"
+    };
+    ui.set_clipboard_notice(i18n::text(ui.global::<Locale>().get_english(), notice).into());
 }
 fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<()> {
     model.save_preferences(ambrum::preferences::Launch {
@@ -830,6 +878,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let ui = Launcher::new()?;
     {
         use slint::winit_030::{WinitWindowAccessor, winit};
+        let input_weak = ui.as_weak();
+        ui.window().on_winit_window_event(move |_, event| {
+            if let Some(ui) = input_weak.upgrade() {
+                match event {
+                    winit::event::WindowEvent::KeyboardInput { .. } => {
+                        ui.global::<Theme>().set_keyboard_focus(true)
+                    }
+                    winit::event::WindowEvent::MouseInput { .. }
+                    | winit::event::WindowEvent::Touch(_) => {
+                        ui.global::<Theme>().set_keyboard_focus(false)
+                    }
+                    _ => {}
+                }
+            }
+            slint::winit_030::EventResult::Propagate
+        });
         let weak = ui.as_weak();
         let move_weak = ui.as_weak();
         ui.on_move_window(move || {
@@ -1089,6 +1153,33 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     {
         let model = model.clone();
+        ui.on_cancel_login(move || model.borrow_mut().cancel_login());
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_copy_device_code(move || {
+            if let Some(ui) = weak.upgrade() {
+                copy_device_code(&ui, &model.borrow().device_code);
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        let weak = ui.as_weak();
+        ui.on_choose_install_location(move |index| {
+            if let (Some(ui), Some(location)) = (
+                weak.upgrade(),
+                usize::try_from(index)
+                    .ok()
+                    .and_then(|i| model.borrow().locations.get(i).cloned()),
+            ) {
+                ui.set_install_parent(location.destination().display().to_string().into());
+            }
+        });
+    }
+    {
+        let model = model.clone();
         ui.on_discover_java(move || operation(&model, Model::discover_java));
     }
     {
@@ -1173,16 +1264,30 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let view = view.clone();
         let weak = ui.as_weak();
         ui.on_choose_account(move |index| {
-            let m = model.borrow();
+            let mut m = model.borrow_mut();
             if m.busy() {
                 return;
             }
             let account = usize::try_from(index - 1)
                 .ok()
-                .and_then(|i| m.accounts.get(i));
-            view.borrow_mut().account = account.map(|a| a.id.clone());
+                .and_then(|i| m.accounts.get(i))
+                .cloned();
+            let choice = account.as_ref().map(|a| a.id.clone());
+            if let Err(error) = m.choose_account(choice.clone()) {
+                m.report(error);
+                return;
+            }
+            view.borrow_mut().account = choice;
             if let Some(ui) = weak.upgrade() {
-                ui.set_account_label(account.map_or("登录微软账户", |a| a.name.as_str()).into());
+                ui.set_account_label(
+                    account
+                        .as_ref()
+                        .map_or(
+                            i18n::text(ui.global::<Locale>().get_english(), "登录微软账户"),
+                            |a| a.name.as_str(),
+                        )
+                        .into(),
+                );
             }
         });
     }
@@ -1241,8 +1346,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let model = model.clone();
         let weak = ui.as_weak();
         ui.window().on_close_requested(move || {
-            if model.borrow().busy() || model.borrow().network.active() {
+            if model.borrow().busy()
+                || model.borrow().login_active()
+                || model.borrow().network.active()
+            {
                 model.borrow_mut().cancel();
+                model.borrow_mut().cancel_login();
                 model.borrow_mut().network.shutdown();
                 if let Some(ui) = weak.upgrade() {
                     ui.set_panel(5);
@@ -1253,7 +1362,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
-    operation(&model, Model::reload);
+    let launcher_root = std::env::current_exe()?
+        .parent()
+        .ok_or("Missing launcher folder")?
+        .to_path_buf();
+    operation(&model, |m| m.initialize(launcher_root));
     net(&model, |n| n.reload());
     refresh(&ui, &model.borrow(), &mut view.borrow_mut());
     let timer = slint::Timer::default();
