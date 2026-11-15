@@ -702,3 +702,24 @@ msgstr "Create independent copy"
 
 msgid "副本名称（同时作为新文件夹名）"
 msgstr "Copy name (also used for the new folder)"
+
+msgid "可创建独立副本；游戏和加载器从官方来源重建，原库保持只读。"
+msgstr "Create an independent copy. Rebuild Minecraft and its loader from official sources; keep the source read-only."
+
+msgid "仅可查看。游戏、加载器或隔离位置尚未确认，请在原启动器核对后重新扫描。"
+msgstr "Inspection only. Confirm the game, loader and data location in the original launcher, then rescan."
+
+msgid "复制存档、资源包、截图和设置，不复制账户或启动器配置。模组实例还会复制模组与脚本。总计最多 16 GiB，请先关闭来源游戏。"
+msgstr "Copies saves, packs, screenshots and settings, excluding accounts and launcher configuration. Modded copies include mods and scripts. Limit: 16 GiB. Close the source game first."
+
+msgid "模组和脚本将在游戏中执行，请仅导入可信来源。Forge / NeoForge 需要兼容的 Java 才能重建。"
+msgstr "Mods and scripts execute in the game. Import trusted sources only. Forge / NeoForge rebuilding needs compatible Java."
+
+msgid "信任来源并复制模组与脚本"
+msgstr "Trust source and copy mods and scripts"
+
+msgid "检查正式版本"
+msgstr "Check stable releases"
+
+msgid "打开官方下载页"
+msgstr "Open official download page"

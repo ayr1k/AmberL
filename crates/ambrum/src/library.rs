@@ -2,6 +2,7 @@
 use crate::{Result, paths, task::Cancellation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+mod identity;
 use std::{
     collections::BTreeSet,
     fs,
@@ -48,6 +49,7 @@ pub struct Instance {
     pub name: String,
     pub game: String,
     pub loader: String,
+    pub loader_choice: Option<crate::loader::Choice>,
     pub isolation: Isolation,
     pub game_dir: Option<PathBuf>,
     pub evidence: Vec<String>,
@@ -138,6 +140,7 @@ impl Library {
                 name,
                 game: "?".into(),
                 loader: "?".into(),
+                loader_choice: None,
                 isolation: Isolation::Unknown,
                 game_dir: None,
                 evidence: vec![],
@@ -167,6 +170,7 @@ impl Library {
             name: string(&meta, "name", name),
             game: string(&meta, "game", "?"),
             loader: string(&meta, "loader", "vanilla"),
+            loader_choice: None,
             isolation: Isolation::Isolated,
             game_dir: Some(dir),
             evidence: vec!["AMBER instance.json + instances layout".into()],
@@ -351,58 +355,13 @@ impl Library {
         } else {
             (Isolation::Unknown, None)
         };
-        let mut loaders = BTreeSet::new();
-        for meta in &chain {
-            if let Some(libs) = meta.get("libraries") {
-                for lib in libs.as_array().ok_or("无效的依赖列表")? {
-                    let coordinate = lib
-                        .get("name")
-                        .and_then(Value::as_str)
-                        .ok_or("无效的依赖坐标")?;
-                    for (prefix, loader) in [
-                        ("net.fabricmc:fabric-loader:", "Fabric"),
-                        ("org.quiltmc:quilt-loader:", "Quilt"),
-                        ("net.minecraftforge:forge:", "Forge"),
-                        ("net.neoforged:neoforge:", "NeoForge"),
-                        ("net.neoforged.fancymodloader:loader:", "NeoForge"),
-                    ] {
-                        if coordinate.starts_with(prefix) {
-                            loaders.insert(loader);
-                        }
-                    }
-                }
-            }
-        }
-        let main = chain
-            .iter()
-            .find_map(|m| m.get("mainClass").and_then(Value::as_str));
-        let loader = if loaders.is_empty() {
-            if main == Some("net.minecraft.client.main.Main") {
-                "Vanilla".into()
-            } else {
-                "Unknown".into()
-            }
-        } else {
-            loaders.into_iter().collect::<Vec<_>>().join(" + ")
-        };
-        let game = chain
-            .iter()
-            .find_map(|m| {
-                m.get("patches")
-                    .and_then(Value::as_array)
-                    .and_then(|ps| {
-                        ps.iter()
-                            .find(|p| p.get("id").and_then(Value::as_str) == Some("game"))
-                    })
-                    .and_then(|p| p.get("version").and_then(Value::as_str))
-            })
-            .map(str::to_owned)
-            .unwrap_or_else(|| string(chain.last().unwrap(), "id", "?"));
+        let (game, loader, loader_choice) = identity::resolve(&chain)?;
         Ok(Instance {
             id,
             name: name.into(),
             game,
             loader,
+            loader_choice,
             isolation,
             game_dir,
             evidence: directories.into_iter().map(|(_, s)| s).collect(),

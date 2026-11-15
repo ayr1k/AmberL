@@ -5,7 +5,11 @@ pub fn text(english: bool, value: &str) -> &str {
         return value;
     }
     match value {
-        "操作完成" => "Completed",
+        "暂无可用的新正式版本" => "No newer stable release is available",
+        "仅手动检查 AmberL 官方正式版本；不会自动下载或安装。" => {
+            "Checks official AmberL stable releases on request. No automatic download or installation."
+        }
+        "正在检查 AmberL 正式版本…" => "Checking official AmberL stable releases…",
         "正在处理…" => "Working…",
         "选择或安装一个游戏" => "Choose or install a game",
         "你的下一段冒险" => "Your next adventure",

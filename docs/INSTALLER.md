@@ -2,7 +2,7 @@
 
 Windows x64, current user only. Independent application ID, uninstall registration,
 Start Menu entry and default `LocalAppData/Programs/AmberL Preview` install location.
-It does not replace AMBER, AmberE or AmberX. No stable release/update feed is enabled.
+It does not replace AMBER, AmberE or AmberX. No automatic stable update feed is enabled. Manual official release discovery is described in UPDATES.md.
 The exact Git revision and corresponding MPL source archive are installed alongside
 the executable. See FIRST-VERSION.md for implemented behavior and pending acceptance.
 
@@ -21,3 +21,16 @@ Build a clean committed UI package first, then run:
 The resulting installer and SHA-256 sidecar belong in the Draft PR's test artifacts.
 Clean-machine, upgrade and uninstall/data-retention checks must be reported separately
 from merely compiling the installer. No stable publication is implied.
+
+## Runtime delivery
+
+The packages and Preview installer now include unmodified, Microsoft-signed x64
+release CRT DLLs from the build machine's Visual Studio redistributable directory.
+Each signature is checked before copying; runtime version, original notices and
+package checksums are retained. No administrator/system runtime installation is run.
+Actual QA confirmed VCRUNTIME140.dll loading from beside amberl.exe. This removes
+the observed missing-VC-runtime prerequisite; it is not clean-OS certification.
+Windows system DLLs and graphics drivers remain OS prerequisites.
+
+测试包随应用携带官方签名的 Visual C++ 运行库，并纳入校验清单；不修改系统运行库。
+已确认实际从应用目录加载。干净系统和其他显卡的验收仍需独立记录。

@@ -5,6 +5,8 @@ pub(super) struct Request {
     parent: PathBuf,
     name: String,
     shared: bool,
+    mods: bool,
+    java: PathBuf,
     os: String,
 }
 impl Model {
@@ -13,6 +15,8 @@ impl Model {
         parent: PathBuf,
         name: String,
         shared: bool,
+        mods: bool,
+        java: PathBuf,
         os: String,
     ) -> Result<()> {
         let game = self
@@ -25,6 +29,8 @@ impl Model {
             parent,
             name,
             shared,
+            mods,
+            java,
             os,
         }))
     }
@@ -40,6 +46,8 @@ pub(super) fn execute(
         parent,
         name,
         shared,
+        mods,
+        java,
         os,
     } = request;
     ambrum::install::check_destination(app, &parent, &name)?;
@@ -52,10 +60,11 @@ pub(super) fn execute(
         return Err("游戏库登记已变化，请重新选择".into());
     }
     drop(registry);
-    let mut source = ambrum::import::Source::open(
+    let mut source = ambrum::import::Source::open_confirmed(
         app,
         game.copy_source.as_ref().ok_or("缺少已确认的导入来源")?,
         shared,
+        mods,
         cancel,
     )?;
     source.check_parent(&parent)?;
@@ -66,9 +75,28 @@ pub(super) fn execute(
         resolved.metadata_path.parent().ok_or("缺少元数据目录")?,
         &resolved.metadata_path,
     )?;
-    ambrum::loader::display(&mut metadata, &name, &game.icon)?;
     let platform = Platform::windows_x64(&os);
     let budget = 16 * 1024 * 1024 * 1024;
+    if let Some(choice) = source.loader() {
+        send(
+            sender,
+            Message::Status(format!(
+                "正在从官方来源重建 {} {}…",
+                choice.kind, choice.version
+            )),
+        )?;
+        metadata = ambrum::loader::resolve(
+            &cache,
+            &metadata,
+            choice,
+            &java,
+            &platform,
+            budget,
+            &ambrum::download::Https,
+            cancel,
+        )?;
+    }
+    ambrum::loader::display(&mut metadata, &name, &game.icon)?;
     send(
         sender,
         Message::Status("正在下载并校验副本的官方游戏资源…".into()),

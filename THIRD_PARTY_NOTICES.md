@@ -47,7 +47,7 @@ not exposed through the core/bridge API. See docs/UI-COMPARISON.md for scope.
 The C++/WinRT host uses locked Microsoft Windows App SDK 2.6.5 components and SDK
 runtime assets, with original Microsoft notices. WebView2 metadata/loader is a build
 dependency of WinUI projections, not an embedded browser or instantiated WebView.
-Windows and the Microsoft Visual C++ x64 runtime remain host prerequisites.
+Windows remains a host prerequisite. The package now includes app-local Microsoft Visual C++ x64 release runtimes.
 
 The integrated launcher also uses image 0.25.10 (MIT OR Apache-2.0) for a cached
 Gaussian blur of the embedded static scene. The PNG decoder and its locked transitive
@@ -83,3 +83,10 @@ SHA-256 is `5197c1b69564089cdc229fc1260a0e25db1e722b1b7db45fe1542c3c43edf9ae`;
 executable/license pins are in `crates/ambrum/src/multiplayer/frp.rs`.
 Paper and selected Modrinth plugins are downloaded for the user's owned server,
 not redistributed in AmberL packages. Their upstream licenses remain applicable.
+
+Microsoft Visual C++ release runtime DLLs are copied unmodified from the installed
+Visual Studio redistributable directory, with Microsoft Authenticode verification.
+Original installed third-party/redistribution notices and source/version references
+are included in `licenses/microsoft-vc-runtime-*`; all binaries are checksummed.
+Redistribution references: https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+and https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files.

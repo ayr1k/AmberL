@@ -39,6 +39,8 @@ mod state;
 pub mod task;
 #[cfg(windows)]
 mod transaction;
+#[cfg(windows)]
+pub mod updates;
 
 /// Public application configuration explicitly shared with AMBER. Never a credential.
 pub const MICROSOFT_CLIENT_ID: &str = "ab7cf49a-fea7-432d-8ce8-beb922eb554e";

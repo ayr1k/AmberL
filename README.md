@@ -1,10 +1,26 @@
 # AmberL / Ambrum
 
 A lightweight, carefully designed Minecraft game and multiplayer workstation.
-Ambrum is its UI-independent Rust core. **Early development: native launcher preview with authenticated Vanilla launch; not a finished product.**
+Ambrum is its UI-independent Rust core. **First-version development candidate for Windows x64; user acceptance and stable publication are separate steps.**
 
 轻量、精致、易用的 Minecraft 游戏与联机工作站。减少必须做的决定，保留必要选择。
 **当前是开发预览：原生界面已接入微软账户、安全存储、Java 选择、组件安装、原版启动，以及服务端和邀请联机；跨设备联机和完整兼容性验收尚未完成。**
+
+Start with the Windows test installer or `launcher/amberl.exe` in the UI ZIP from
+[Draft PR #1](https://github.com/ayr1k/AmberL/pull/1). The PR identifies the exact tested
+revision and downloadable builds. Runtime DLLs and notices are bundled; keep the whole
+ZIP together. The core/probe ZIP is for diagnostics, not the main launcher.
+
+首版开发候选包含原版与 Fabric/Quilt/现代 Forge/NeoForge 安装、微软账户、Java 下载与选择、
+内容搜索和恢复、游戏库副本、独立联机工作区、服务端与邀请及 FRP。首次使用可先登录微软账户，
+安装游戏并选择兼容 Java；联机页面分别管理服务端和连接，不把进程启动等同于已可加入。
+外部库默认只读，支持范围见 [副本能力表](docs/IMPORT.md)。
+
+See [completion and deferred acceptance](docs/FIRST-VERSION.md),
+[multiplayer](docs/MULTIPLAYER.md), [content/Java](docs/CONTENT.md),
+[installer](docs/INSTALLER.md), and [manual updates](docs/UPDATES.md).
+Two-device/NAT, another clean Windows machine, full accessibility and personal-library
+acceptance are deferred. No merge or stable release is implied.
 
 ## Current milestone / 当前进度
 
@@ -30,12 +46,11 @@ Ambrum is its UI-independent Rust core. **Early development: native launcher pre
 
 The original Windows UI remains a **system-control comparison baseline**. Separate
 [Slint and WinUI 3 samples](docs/UI-COMPARISON.md) now exercise the same Rust model;
-input/accessibility/DPI acceptance remains open. No framework selection or final design
-is implied. No WebView or Node process.
+input/accessibility/DPI acceptance remains open. Slint is the development-candidate
+delivery host; final comparison acceptance remains deferred. No WebView or Node process.
 The [integrated launcher preview](docs/NATIVE-UI.md) uses the selected dark visual direction,
 full-window scenery and cached Gaussian glass panels. Open `launcher/amberl.exe` in the
-UI package for real account/Java/library/install/launch controls. Third-party content and
-full process/exit UX remain future work. A detected loader
+UI package for real account/Java/library/install/launch/content/multiplayer controls. A detected loader
 is **not** a claim of launch compatibility.
 
 ## Try the development probe / 试用开发样机
@@ -49,7 +64,7 @@ Path replacement or damaged configuration produces an error and preserves the ol
 解压开发包，运行 `amberl-native-probe.exe`：选择测试库副本 → 扫描 → 添加此库。
 关闭后重新打开，可从已添加的库列表继续扫描。移除登记不会删除游戏文件。
 Core 包保留扫描基线和命令行；UI 包中的 `launcher/amberl.exe` 是新的完整背景与毛玻璃界面。
-两者均为免安装开发预览。联机功能位于 UI 包的新启动器；原始扫描窗口不是新启动器界面。
+ZIP 可免安装运行，也提供独立的用户级测试安装器。联机功能位于 UI 包的新启动器；原始扫描窗口不是新启动器界面。
 包内包含对应源码压缩包、修订号、校验值和依赖许可。
 
 For isolated testing, create an empty app-data directory and pass
@@ -68,7 +83,7 @@ and checks cache reuse. The resumed Windows test passed actual HTTPS and cache r
 the earlier DNS failure is retained only as history in the validation record.
 
 新增下载核心与命令行测试入口：暂存、取消、失败重试、大小和哈希校验、缓存复用。
-尚未接入游戏安装或内容搜索界面；本机真实 HTTPS、校验及缓存复用现已通过。
+同一下载核心已用于游戏安装与内容下载；以下命令行说明保留独立诊断入口。
 
 Metadata planning (Windows x64, no network or game writes):
 `amberl-inspect plan-vanilla <metadata.json> <windows-os-version>` and
@@ -152,8 +167,9 @@ AMBER's Electron/Node service graph is not embedded. No stable release is author
 
 See [login, Java and launch instructions](docs/AUTH-LAUNCH.md). Windows device login,
 protected account reopen/refresh, explicit Java 25 and Vanilla 26.3 menu/world/save/exit
-have been tested on a new disposable instance. This is a CLI vertical slice, not a
-final UI or completion of Stage B. No original game/account data was reused.
+have been tested on a new disposable instance. The original CLI vertical slice remains
+available; these flows are also integrated in the native launcher. No original game/account
+data was reused.
 
 ### Native installation wizard (development)
 
@@ -177,4 +193,4 @@ backups/new-copy recovery, stopped-server configuration, official Java downloads
 recoverable Modrinth content groups with optional dependency choices. See
 [content/Java](docs/CONTENT.md), [test installer](docs/INSTALLER.md) and the
 [full first-version completion ledger](docs/FIRST-VERSION.md). This is still a
-development preview; two-device acceptance and other listed first-version work remain.
+development candidate; two-device and other user/device-dependent acceptance remain deferred.

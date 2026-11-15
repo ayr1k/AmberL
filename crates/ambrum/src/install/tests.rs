@@ -613,3 +613,80 @@ fn import_requires_current_known_directory_and_rejects_aliases() {
     assert!(crate::import::Source::open(&f.app, &selected, false, &c).is_err());
     assert_eq!(fs::read(outside).unwrap(), b"keep");
 }
+
+#[test]
+fn modded_import_requires_consent_matches_loader_and_preserves_source() {
+    let f = Fixture::new();
+    let library = f.root.join("external");
+    let game = library.join("versions/renamed-pack");
+    fs::create_dir_all(game.join("mods")).unwrap();
+    fs::create_dir_all(game.join("kubejs/server_scripts")).unwrap();
+    let profile = game.join("renamed-pack.json");
+    let mut meta = json!({"id":"renamed-pack","clientVersion":"test","gameDir":"versions/renamed-pack","libraries":[{"name":"net.fabricmc:fabric-loader:0.16.10"}]});
+    fs::write(&profile, meta.to_string()).unwrap();
+    fs::write(game.join("mods/user.jar"), b"trusted-disposable-fixture").unwrap();
+    fs::write(
+        game.join("kubejs/server_scripts/test.js"),
+        b"fixture-script",
+    )
+    .unwrap();
+    fs::write(game.join("accounts.json"), b"excluded-fixture").unwrap();
+    let mut registry = crate::registry::Registry::open(&f.app).unwrap();
+    let id = registry.attach(&library).unwrap().id;
+    let c = Cancellation::default();
+    let selected =
+        crate::import::Selection::capture(&registry.scan(&id, &c).unwrap().instances[0]).unwrap();
+    drop(registry);
+    assert!(crate::import::Source::open(&f.app, &selected, false, &c).is_err());
+    let mut source =
+        crate::import::Source::open_confirmed(&f.app, &selected, false, true, &c).unwrap();
+    let cache = Cache::open(&f.app).unwrap();
+    let platform = Platform::windows_x64("10.0.26100");
+    assert!(
+        vanilla_with_data(
+            &cache,
+            &f.metadata,
+            &platform,
+            &f.parent,
+            "wrong-loader",
+            1024 * 1024,
+            Some(&mut source),
+            &c,
+            |_| {}
+        )
+        .is_err()
+    );
+    assert!(!f.parent.join("wrong-loader").exists());
+    let mut installed = f.metadata.clone();
+    installed["mainClass"] = json!("net.fabricmc.loader.impl.launch.knot.KnotClient");
+    installed["amberlLoader"] = json!({"choice":{"kind":"Fabric","version":"0.16.10"}});
+    let copied = vanilla_with_data(
+        &cache,
+        &installed,
+        &platform,
+        &f.parent,
+        "copied-pack",
+        1024 * 1024,
+        Some(&mut source),
+        &c,
+        |_| {},
+    )
+    .unwrap();
+    drop(source);
+    assert_eq!(
+        fs::read(copied.game_directory.join("mods/user.jar")).unwrap(),
+        b"trusted-disposable-fixture"
+    );
+    assert_eq!(
+        fs::read(copied.game_directory.join("kubejs/server_scripts/test.js")).unwrap(),
+        b"fixture-script"
+    );
+    assert!(!copied.game_directory.join("accounts.json").exists());
+    assert_eq!(
+        fs::read(game.join("mods/user.jar")).unwrap(),
+        b"trusted-disposable-fixture"
+    );
+    meta["libraries"][0]["name"] = json!("net.fabricmc:fabric-loader:0.16.9");
+    fs::write(&profile, meta.to_string()).unwrap();
+    assert!(crate::import::Source::open_confirmed(&f.app, &selected, false, true, &c).is_err());
+}

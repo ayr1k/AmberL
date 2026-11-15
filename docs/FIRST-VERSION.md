@@ -4,15 +4,24 @@ User direction, 2026-11-14: continue until the first version is complete, includ
 multiplayer. This ledger tracks the full PLAN.md contract; an implementation check
 is not user acceptance or authorization to merge/publish. Baseline: `452c161`.
 
-| Area | Existing evidence | Remaining work / acceptance |
+Latest user direction: skip acceptance requiring the user's participation for now;
+finish independent development and automatable verification. Deferred acceptance is
+not a pass and does not block work on other areas. Two-device/NAT testing, the user's
+own-library/task acceptance and subjective framework/appearance approval remain
+explicitly deferred. Merge and stable publication still require separate authorization.
+
+用户要求先跳过需要本人完成的验收，继续完成开发和可自动验证项目。双机外网、
+用户实际游戏库与体验验收保持“待验”，不能记作通过，也不作为继续开发的阻碍。
+
+| Area | Implemented development scope / evidence | Deferred acceptance / supported limits |
 |---|---|---|
-| Accounts and launch | Microsoft/DPAPI, explicit Java, Vanilla and four client loaders run | Broader supported matrix, old Java/game, error/recovery acceptance |
+| Accounts and launch | Microsoft/DPAPI, explicit Java, Vanilla and four client loaders run; 1.12.2/Java 8 and 1.21.4/Java 21 actual world entry/save/re-entry/exit; contextual recovery guidance | All historical loader/game combinations are not certified |
 | Multiplayer | Vanilla, Fabric, Quilt, Forge, NeoForge and Paper lifecycle; verified snapshots restored into new runnable worlds; bounded configuration with recovery; invitation; one-PC authenticated entry; FRP forwarding/node-restart reconnection and independent stop | Public-node and two physical devices/NAT acceptance |
-| Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Additional provider/error matrices and broader GUI acceptance |
-| Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection; Java 8 old server and Java 25 Forge worlds | Additional runtime variants and game/UI acceptance |
-| Libraries and data | Multi-library read-only registration; known Vanilla data copied into a new verified installation; shared confirmation/unknown blocking; naming/icons, snapshots/new-copy restore and recoverable removal | Broader imported-library/modded/alias support and user-library acceptance |
-| Desktop | Frameless glass, version list, saved per-game choices, persistent light/dark appearance and Chinese/English UI | Final framework comparison decision, broader diagnostic localization, full keyboard/IME/Narrator/DPI acceptance |
-| Delivery | Exact-source ZIP, checksums/notices, Draft PR and CI; per-user installer with actual install/upgrade/launch/uninstall/data-retention verification | Update channel, clean-machine startup, release documentation |
+| Content | Modrinth search, overridable discovery filters, compatible versions, required/optional dependencies, verified install, shared dependencies, recoverable groups; actual Mod Menu client and LuckPerms Paper loading | Provider declarations are not universal mod compatibility; copied unmanaged mods retain their own provenance |
+| Java | Local discovery plus official manifest/hash-verified independent runtimes; real Java 8/21/25 inspection and game/server use | Additional OS/architecture/runtime variants are outside the tested Windows x64 matrix |
+| Libraries and data | Read-only registration; Vanilla and exactly identified Fabric/Quilt/Forge/NeoForge copies; renamed profiles, explicit mod trust, shared confirmation/unknown blocking; names/icons, snapshots/new-copy restore and recoverable removal | User-library acceptance; unknown/custom/legacy profiles remain blocked per IMPORT.md |
+| Desktop | Frameless glass, searchable versions, saved choices, themes/languages, page/button transitions, independent Multiplayer, native drag/resize, contextual recovery help; Slint candidate delivery | Final subjective framework comparison, full Narrator/high contrast, cross-monitor DPI; raw provider diagnostics keep their language |
+| Delivery | Exact-source ZIP, checksums/notices, Draft PR/CI, per-user installer; app-local signed CRT; manual repository-specific stable-release check | Another clean Windows machine and user installer acceptance; no automatic installer execution or stable publication |
 | Product acceptance | Disposable local fixtures and user feedback | Same-condition AMBER comparison, two-device and user task acceptance |
 
 Only synthetic fixtures or disposable copies may be changed during validation. All
@@ -73,4 +82,24 @@ Development evidence (each package/PR pins its tested revision):
   Actual native import of a disposable HMCL-style world, world entry/save/exit 0,
   unchanged source hashes, shared confirmation and unknown-isolation blocking passed.
   The final form was inspected at 1002 × 702; 126 workspace tests pass. See IMPORT.md
-  for copied data, recovery and the remaining modded/alias compatibility limits.
+  for copied data and recovery. The following slice extends that original Vanilla scope.
+- Exactly identified Fabric/Quilt/Forge/NeoForge and renamed metadata are now covered
+  by the read-only capability matrix. Mod/script copies require explicit trust;
+  official resources are rebuilt without source launch arguments. A real Fabric 26.3 /
+  0.20.1 copy loaded 51 mods, entered/saved a new QA world and exited 0; seven source
+  fixture files still matched after launch. 129 workspace tests pass.
+- Manual stable-release discovery is independent of AMBER/AmberE and was checked
+  against the live empty AmberL release list, including the native About UI.
+  Release metadata validation covers version/channel/repository/digest boundaries.
+- Packages include signature-checked, app-local Microsoft release runtimes and notices;
+  actual VCRUNTIME140.dll loading from the application directory was confirmed.
+  This removes the observed runtime dependency, not the need for another-machine acceptance.
+- High application scale revealed oversized initial windows; initial sizing now waits
+  for the native window and fits the monitor work area. 200% startup, minimum 800 × 500
+  logical layout, scrollable configuration/import and Multiplayer were inspected.
+  Contextual recovery instructions supplement raw diagnostics. See NATIVE-UI.md.
+
+The first development candidate covers the supported scope above. Package integrity,
+installer lifecycle, exact revision and CI results are recorded in Draft PR #1 for
+each delivery. The remaining user/device-dependent acceptance is deferred, never
+counted as passed; this candidate is not a merged or published stable release.

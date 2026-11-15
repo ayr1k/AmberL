@@ -9,12 +9,16 @@ if (Test-Path -LiteralPath $package) { throw 'Retain previous packages; choose a
 New-Item -ItemType Directory -Path $package,(Join-Path $package 'launcher'),(Join-Path $package 'slint'),(Join-Path $package 'winui'),(Join-Path $package 'scripts'),(Join-Path $package 'licenses') | Out-Null
 Copy-Item (Join-Path $SlintTarget 'release/amberl.exe') -Destination (Join-Path $package 'launcher')
 Copy-Item (Join-Path $SlintTarget 'release/amberl-slint-probe.exe') -Destination (Join-Path $package 'slint')
+& ./scripts/copy-msvc-runtime.ps1 -Destination (Join-Path $package 'launcher') -Licenses (Join-Path $package 'licenses')
+Get-ChildItem (Join-Path $package 'launcher') -Filter '*.dll' | Copy-Item -Destination (Join-Path $package 'slint')
 # Preserve all SDK runtime assets and subdirectories; exclude build/debug products.
 Get-ChildItem local/ui-build/winui | Where-Object { $_.Name -notmatch '\.(pdb|lib|exp|ilk|iobj|ipdb|recipe)$' -and $_.Name -ne 'amberl-winui-probe.pri' } | Copy-Item -Destination (Join-Path $package 'winui') -Recurse
+Get-ChildItem (Join-Path $package 'launcher') -Filter '*.dll' | Copy-Item -Destination (Join-Path $package 'winui')
 Copy-Item assets/instance-icons/LICENSE-lucide.txt -Destination (Join-Path $package 'licenses')
 Copy-Item docs/FRP.md -Destination $package
 Copy-Item docs/INSTANCE-RECOVERY.md -Destination $package
 Copy-Item docs/IMPORT.md -Destination $package
+Copy-Item docs/UPDATES.md -Destination $package
 Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,docs/UI-COMPARISON.md,docs/NATIVE-UI.md,docs/LOADER-VERIFICATION.md,docs/MULTIPLAYER.md,docs/CONTENT.md,docs/FIRST-VERSION.md,docs/INSTALLER.md,design-qa.md -Destination $package
 Copy-Item scripts/make-fixture.ps1 -Destination (Join-Path $package 'scripts')
 git -c core.autocrlf=false archive --format=zip "--output=$package/AmberL-source.zip" HEAD

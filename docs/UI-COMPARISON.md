@@ -2,9 +2,12 @@
 
 These are two working comparison hosts, not the final launcher UI. The package now
 also includes the separate [integrated launcher preview](NATIVE-UI.md) in `launcher/`.
-The authenticated CLI launch slice remains available separately. No framework is selected
-yet: Chinese IME composition, reader acceptance, DPI transitions and clean-machine
-deployment still gate the decision.
+The authenticated CLI launch slice remains available separately. The first development
+candidate uses Slint for the integrated launcher: the existing product flows and accepted
+visual direction are implemented there, with direct Rust-model integration. This is the
+delivery choice, not final framework/accessibility acceptance or a performance-superiority
+claim. The two comparison hosts remain available; user-dependent comparison, full Narrator,
+cross-monitor DPI and another clean Windows machine are explicitly deferred.
 
 两套样机调用相同的 Ambrum 只读扫描和交互模型，可扫描测试库、筛选与选择条目、
 查看隔离证据、编辑中文文本、运行和取消模拟任务。不会登录、安装或启动游戏。
@@ -26,8 +29,9 @@ Both poll at 50 ms. The explicitly synthetic task generates 100 lines/second for
 
 Windows x64; Windows 10 1809 or newer is the SDK minimum, not a tested compatibility
 claim. Actual checks used Windows 11. WinUI includes its app-local Windows App SDK
-runtime; the Microsoft Visual C++ 2015–2022 x64 runtime must already be installed.
-It does not install or change system runtimes. No account/game files are packaged.
+runtime. Packages now include signed Microsoft Visual C++ release runtime DLLs beside
+each executable, with redistribution notices. They do not install or change system
+runtimes. No account/game files are packaged.
 
 Extract the complete ZIP. Open `slint/amberl-slint-probe.exe` or
 `winui/amberl-winui-probe.exe`, enter the same synthetic library path, then Scan.

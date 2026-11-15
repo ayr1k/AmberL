@@ -1,5 +1,10 @@
 # Product contract and staged delivery
 
+Current delivery status is tracked in [FIRST-VERSION.md](FIRST-VERSION.md). The stages
+below preserve the original plan, not a claim that early-stage limitations still apply.
+User-dependent acceptance is deferred at the user's request; development delivery does
+not authorize merge or a stable release.
+
 ## Outcome / 目标
 Complete local game and multiplayer fundamentals with lower decision burden, clear
 object context, fast response and refined native interaction. Compare against AMBER

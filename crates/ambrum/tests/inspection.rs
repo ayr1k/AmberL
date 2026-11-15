@@ -70,6 +70,44 @@ fn content_presence_does_not_prove_isolation_and_scanning_does_not_write() {
 }
 
 #[test]
+fn renamed_modded_profiles_preserve_exact_loader_identity_and_reject_conflicts() {
+    for (kind, coordinate, version) in [
+        ("Fabric", "net.fabricmc:fabric-loader:0.16.10", "0.16.10"),
+        ("Quilt", "org.quiltmc:quilt-loader:0.28.1", "0.28.1"),
+        (
+            "Forge",
+            "net.minecraftforge:forge:1.21.4-54.1.0:universal",
+            "1.21.4-54.1.0",
+        ),
+        ("NeoForge", "net.neoforged:neoforge:21.4.123", "21.4.123"),
+    ] {
+        let f = Fixture::new();
+        f.profile("custom-name", json!({"clientVersion":"1.21.4", "gameDir":"versions/custom-name", "libraries":[{"name":coordinate}]}));
+        let scan = f.scan();
+        let row = &scan.instances[0];
+        assert_eq!(row.game, "1.21.4");
+        assert_eq!(row.loader, kind);
+        assert_eq!(row.loader_choice.as_ref().unwrap().version, version);
+        assert!(ambrum::import::eligible(row));
+        f.profile("custom-name", json!({"clientVersion":"1.21.4", "patches":[{"id":"game","version":"1.20.1"}], "gameDir":"versions/custom-name", "libraries":[{"name":coordinate}]}));
+        assert!(f.scan().instances[0].issue.is_some());
+    }
+    let f = Fixture::new();
+    f.profile(
+        "alias",
+        json!({"clientVersion":"1.21.4", "gameDir":"versions/alias"}),
+    );
+    assert_eq!(f.scan().instances[0].game, "1.21.4");
+    f.profile("alias", json!({"gameDir":"versions/alias", "libraries":[{"name":"net.fabricmc:fabric-loader:0.16.10"},{"name":"net.fabricmc:fabric-loader:0.16.9"}]}));
+    assert!(f.scan().instances[0].issue.is_some());
+    f.profile(
+        "alias",
+        json!({"libraries":[{"name":"net.neoforged.fancymodloader:loader:4.0"}]}),
+    );
+    assert!(!ambrum::import::eligible(&f.scan().instances[0]));
+}
+
+#[test]
 fn pcl_and_hmcl_evidence_can_conflict_without_selecting_a_directory() {
     let f = Fixture::new();
     f.profile("demo", json!({}));

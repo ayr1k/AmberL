@@ -73,16 +73,17 @@ process, service or per-frame CPU convolution is used. System fonts are not bund
 `amberl.exe --app-directory <已有独立目录>`；不要把游戏目录作为应用数据目录。
 账户与 Java 不会自动替换为第一项。后台任务期间不允许切换启动目标。
 外部游戏库只登记和扫描，不迁移、不修改、不直接启动。
-已确认隔离位置的原版实例可通过 **配置 → 游戏库详情与副本** 创建独立副本；
+已确认隔离位置的原版或可准确识别组件的实例可通过 **配置 → 游戏库详情与副本** 创建独立副本；
 共享目录需要勾选确认，原库仍保持只读。详见 [副本导入与限制](IMPORT.md)。
 
 ## Limits / 限制
 
-Stage B remains a preview. Slint carries the chosen visual implementation while
-IME composition, Narrator/high contrast, multi-monitor DPI transitions and clean-machine
-deployment remain acceptance gates. Read-only library parsing is broader than launch
-compatibility. Complete multiplayer acceptance, a production updater and a force-exit
-policy remain future work. Managed runtimes and a per-user test installer are available;
+This is a first-version development candidate. Slint carries the chosen visual implementation;
+full Narrator/high contrast, multi-monitor DPI transitions and another clean-machine
+deployment remain deferred acceptance. Read-only library parsing is broader than launch
+compatibility. Two-device multiplayer acceptance remains deferred. Manual stable-release
+discovery is available in About; see UPDATES.md. There is no automatic installer execution
+or force-exit policy. Managed runtimes and a per-user test installer are available;
 see CONTENT.md and INSTALLER.md. Process creation
 does not establish world readiness. A windowless/unresponsive game can keep cancellation
 waiting; there is no bulk Java termination. No stable release or merge is authorized.
@@ -148,3 +149,18 @@ are preserved. Loader selection uses canonical identities rather than translated
 The English install wizard and multiplayer forms were inspected at 1002 × 702;
 real Paper catalog retrieval confirms translated loader labels still select the
 intended provider. This is not full Narrator, IME or cross-monitor acceptance.
+
+## Scaling and recovery / 缩放与恢复提示
+
+Initial sizing waits for the native window, then fits physical bounds to the current
+monitor work area using the UI scale. Minimum effective layout size is 800 × 500;
+the display work area must accommodate that at the selected scale. Short forms scroll
+instead of hiding their actions; changing pages resets the form scroll position.
+At 200% application scale the initial window, native corner resize to 1600 × 1000
+physical pixels, About/update check, configuration, mod-copy consent and Multiplayer
+were inspected. This does not substitute for cross-monitor or all OS scaling tests.
+
+Common network, Java, account, checksum, space and destination-conflict diagnostics
+include Chinese/English next-step guidance. Original diagnostics remain visible;
+retry is explicit and existing identity/integrity checks still run. No generic idle
+“operation complete” message is restored.

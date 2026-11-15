@@ -303,6 +303,7 @@ mod tests {
             kind: LibraryKind::Minecraft,
         };
         let instance = Instance {
+            loader_choice: None,
             id: ClientInstanceId {
                 library: library.id.clone(),
                 profile: "中文".into(),

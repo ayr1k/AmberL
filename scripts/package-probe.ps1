@@ -9,6 +9,7 @@ $packageRoot = Join-Path (Get-Location) ('artifacts/AmberL-probe-' + $revision.S
 if (Test-Path -LiteralPath $packageRoot) { throw 'Package already exists; retain earlier artifacts.' }
 New-Item -ItemType Directory -Path $packageRoot | Out-Null
 Copy-Item target/release/amberl-native-probe.exe,target/release/amberl-inspect.exe,LICENSE,README.md,THIRD_PARTY_NOTICES.md,Cargo.lock -Destination $packageRoot
+& ./scripts/copy-msvc-runtime.ps1 -Destination $packageRoot -Licenses (Join-Path $packageRoot 'licenses')
 Copy-Item docs -Destination $packageRoot -Recurse
 Copy-Item scripts/test-download-network.ps1 -Destination $packageRoot
 Copy-Item scripts/test-resource-plan.ps1 -Destination $packageRoot

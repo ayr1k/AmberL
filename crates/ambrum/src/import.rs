@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Read-only capture of known Vanilla user data. Executable resources are rebuilt
+//! Read-only capture of known game user data. Executable resources are rebuilt
 //! from official metadata; source launcher settings and credentials never enter a copy.
 use crate::{
     Result,
@@ -16,7 +16,7 @@ use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
 
 pub fn eligible(instance: &Instance) -> bool {
     instance.issue.is_none()
-        && instance.loader == "Vanilla"
+        && (instance.loader == "Vanilla" || instance.loader_choice.is_some())
         && matches!(instance.isolation, Isolation::Isolated | Isolation::Shared)
         && instance.game_dir.is_some()
 }
@@ -28,8 +28,12 @@ pub struct Selection {
     version: String,
     directory: PathBuf,
     shared: bool,
+    loader: Option<crate::loader::Choice>,
 }
 impl Selection {
+    pub fn loader(&self) -> Option<&crate::loader::Choice> {
+        self.loader.as_ref()
+    }
     pub fn capture(instance: &Instance) -> Option<Self> {
         let LibraryId::Registered(library) = &instance.id.library else {
             return None;
@@ -40,12 +44,14 @@ impl Selection {
             version: instance.game.clone(),
             directory: instance.game_dir.clone().unwrap(),
             shared: instance.isolation == Isolation::Shared,
+            loader: instance.loader_choice.clone(),
         })
     }
 }
 
 pub struct Source {
     pub(crate) version: String,
+    pub(crate) loader: Option<crate::loader::Choice>,
     root: DirectoryGuard,
     _directories: Vec<DirectoryGuard>,
     pub(crate) files: Vec<(String, fs::File, u64)>,
@@ -57,6 +63,18 @@ impl Source {
         allow_shared: bool,
         c: &Cancellation,
     ) -> Result<Self> {
+        Self::open_confirmed(app, selected, allow_shared, false, c)
+    }
+    pub fn open_confirmed(
+        app: &Path,
+        selected: &Selection,
+        allow_shared: bool,
+        allow_mods: bool,
+        c: &Cancellation,
+    ) -> Result<Self> {
+        if selected.loader.is_some() && !allow_mods {
+            return Err("模组会在游戏启动时执行；请确认信任来源后复制".into());
+        }
         let registry = Registry::open(app)?;
         let scan = registry.scan(&selected.library, c)?;
         if scan.library.kind != LibraryKind::Minecraft {
@@ -68,7 +86,7 @@ impl Source {
             .find(|i| i.id.profile == selected.profile)
             .ok_or("导入来源已变化，请重新扫描游戏库")?;
         if Selection::capture(instance).as_ref() != Some(selected) {
-            return Err("仅能复制隔离位置已确认的原版实例；请重新扫描并核对版本".into());
+            return Err("仅能复制游戏、加载器和隔离位置已确认的实例；请重新扫描并核对版本".into());
         }
         let shared = instance.isolation == Isolation::Shared;
         if shared && !allow_shared {
@@ -85,12 +103,13 @@ impl Source {
         }
         let mut source = Self {
             version: instance.game.clone(),
+            loader: selected.loader.clone(),
             root,
             _directories: vec![],
             files: vec![],
         };
         let mut pending = vec![];
-        for name in [
+        let mut names = vec![
             "saves",
             "resourcepacks",
             "shaderpacks",
@@ -100,7 +119,11 @@ impl Source {
             "optionsof.txt",
             "optionsshaders.txt",
             "servers.dat",
-        ] {
+        ];
+        if source.loader.is_some() {
+            names.extend(["mods", "defaultconfigs", "kubejs", "scripts"]);
+        }
+        for name in names {
             let path = game.root.join(name);
             match fs::symlink_metadata(&path) {
                 Ok(_) => pending.push(path),
@@ -160,6 +183,9 @@ impl Source {
     }
     pub fn file_count(&self) -> usize {
         self.files.len()
+    }
+    pub fn loader(&self) -> Option<&crate::loader::Choice> {
+        self.loader.as_ref()
     }
     pub fn version(&self) -> &str {
         &self.version

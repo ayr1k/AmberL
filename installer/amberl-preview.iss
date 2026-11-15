@@ -33,6 +33,7 @@ SetupLogging=yes
 DisableProgramGroupPage=yes
 [Files]
 Source: "{#PackageRoot}\launcher\amberl.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\launcher\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PackageRoot}\AmberL-source.zip"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\TEST-REVISION.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -40,6 +41,13 @@ Source: "{#PackageRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\FIRST-VERSION.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\INSTALLER.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\NATIVE-UI.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\MULTIPLAYER.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\CONTENT.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\FRP.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\IMPORT.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\INSTANCE-RECOVERY.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\UPDATES.md"; DestDir: "{app}"; Flags: ignoreversion
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 [Icons]

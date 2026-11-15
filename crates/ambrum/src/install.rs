@@ -159,8 +159,16 @@ pub fn vanilla_with_data(
     let version = VersionPlan::parse(metadata, platform)?;
     if let Some(source) = &source {
         source.check_parent(parent)?;
+        let installed_loader: Option<crate::loader::Choice> = metadata
+            .get("amberlLoader")
+            .map(|loader| {
+                serde_json::from_value(loader["choice"].clone()).map_err(|_| "无效的副本加载器")
+            })
+            .transpose()?;
         if source.version != version.version
-            || metadata["mainClass"] != "net.minecraft.client.main.Main"
+            || source.loader != installed_loader
+            || (source.loader.is_none()
+                && metadata["mainClass"] != "net.minecraft.client.main.Main")
         {
             return Err("副本游戏版本或加载器与来源不符".into());
         }

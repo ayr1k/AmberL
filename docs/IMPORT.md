@@ -1,33 +1,50 @@
 # Independent game copies / 游戏库独立副本
 
-Select an external library's Vanilla instance, open **Configure → Library and copy**,
-review its paths/isolation evidence, and choose a separate existing parent folder and
-new name. The name also becomes the copy's initial display name. Shared directories
-require an explicit checkbox: their data belongs to the directory, not one profile.
-Unknown or conflicting isolation, modded loaders and AMBER-managed layouts cannot
-be imported through this flow. External sources are never launched or modified.
+Select an external instance and open **Configure → Library and copy**. Review the
+resolved Minecraft version, exact loader version and isolation evidence; choose a
+separate existing parent folder and a new copy name. Original sources stay read-only.
+Shared directories require explicit acknowledgement. Modded copies additionally require
+confirmation that the source mods/scripts are trusted, because they execute in Minecraft.
+Forge/NeoForge rebuilding requires compatible Java selected in the form.
 
-选中已有游戏库中的原版实例，在 **配置 → 游戏库详情与副本** 查看来源和隔离依据。
-选择与原库分离的已有父目录，填写新名称。共享目录必须明确勾选，会复制其中全部
-存档与设置，无法按启动配置区分归属。隔离未知、冲突或模组加载器暂不支持导入。
-请先关闭使用来源目录的游戏。副本创建后可以独立启动、管理内容、改名和备份。
+选中外部实例，在 **配置 → 游戏库详情与副本** 核对来源、游戏和加载器版本。
+新副本必须使用与原库分离的位置。共享目录需确认复制整个目录的数据；模组实例
+还需确认信任来源。Forge / NeoForge 重建需要填写兼容的 Java 路径。
+
+## Supported capability matrix
+
+| Source | Inspect | Independent copy | Launch/write original |
+|---|---|---|---|
+| Official/PCL/HMCL `.minecraft`, known Vanilla version and isolation | Yes | Yes | No |
+| Known Fabric/Quilt or supported modern Forge/NeoForge, exact game/loader identity | Yes | Rebuild official resources, copy trusted mod data | No |
+| Renamed profile with `clientVersion`, game patch or consistent inheritance/loader evidence | Yes | If it resolves to official game and loader catalogs | No |
+| Shared data directory | Yes | Explicit shared-data acknowledgement required | No |
+| Unknown/conflicting isolation or conflicting loader versions | Yes, with issue | Blocked | No |
+| Custom patched executables, unsupported legacy loader, unresolved version alias | Limited | Blocked; no guessed replacement | No |
+| AMBER `instances` layout | Read-only metadata inspection | Not supported by this copy path | No |
+| Reparse/symlink/hard-link filesystem aliases | Rejected where unsafe | Blocked | No |
+
+The supported copy reconstructs runtime resources from official providers. Source JARs,
+launcher JVM arguments, Java agents, custom library URLs and executable patches are not
+reused. A profile name is distinct from its actual game version. FML's own version is
+not mistaken for a NeoForge version. Conflicting identity evidence stops copying.
 
 ## Copied data
 
-- Files under `saves`, `resourcepacks`, `shaderpacks`, `screenshots`, and `config`.
-- `options.txt`, `optionsof.txt`, `optionsshaders.txt`, and `servers.dat`.
-- Official Minecraft executable resources are downloaded/revalidated independently;
-  source JARs, libraries, launch arguments and patched executables are not trusted inputs.
+- `saves`, `resourcepacks`, `shaderpacks`, `screenshots`, `config`.
+- `options.txt`, `optionsof.txt`, `optionsshaders.txt`, `servers.dat`.
+- For confirmed modded instances only: `mods`, `defaultconfigs`, `kubejs`, `scripts`.
 
-Accounts, tokens, launcher settings, mods and other unlisted files are excluded.
-Empty directories are not preserved. Resource/shader files are copied as data;
-this does not install the loaders or mods needed to render shaders. Shared-world
-compatibility is not inferred: a Vanilla profile can share a directory with modded
-worlds, which must not be opened without their required mods. The original remains intact.
+Accounts, tokens, launcher settings and all unlisted files are excluded. Empty directories
+are not preserved. Imported mods remain user files, not invented Modrinth installation
+groups; content management will not overwrite them. Whole-instance snapshots preserve
+them. Additional mod-specific data directories are not silently included. Resource/shader
+files alone do not install a shader renderer. Shared directories can contain worlds from
+other versions/modpacks: copying does not prove every world is compatible.
 
-仅复制上述游戏数据，不复制账户、启动器配置、模组或未列出的文件。空目录不保留。
-共享目录可能含模组世界；创建原版副本不代表这些世界与原版兼容。游戏版本必须能
-对应官方目录；自定义版本别名、第三方补丁和整合包不在这次支持范围内。
+仅复制列出的游戏数据，不复制账户、启动器配置或未列出的文件。导入模组保持为
+用户文件，不伪造平台安装记录，也不会被内容安装覆盖。整实例备份会保留这些文件。
+共享目录中的存档可能需要其他版本或模组，不能据此认定全部兼容。
 
 ## Boundaries and recovery
 
@@ -64,3 +81,12 @@ The final native form was also checked at 1002 × 702: shared confirmation gates
 creation, the entered name appears on the completed shared copy, and unknown
 isolation disables both destination fields and creation. All tests used disposable
 libraries. The 126-test workspace suite and both targeted import regressions passed.
+
+Current development evidence: exact Fabric/Quilt/Forge/NeoForge identities and renamed
+profiles covered by scanner fixtures; conflict, changed selection, missing mod consent,
+wrong destination loader and excluded launcher state covered by import regressions.
+A disposable HMCL-style renamed Fabric 26.3 / 0.20.1 profile was rebuilt using official
+resources, copying three known test mod JARs. Minecraft displayed 51 loaded mods,
+entered a new QA world, saved and exited with code 0. Seven source fixture files retained
+their hashes; an injected fixture Java-agent argument was not copied to launch metadata.
+This is real Fabric evidence, not a claim that every arbitrary modpack is compatible.

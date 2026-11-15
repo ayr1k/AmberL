@@ -5,10 +5,14 @@ use slint::Model as _;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
+#[path = "../diagnostics.rs"]
+mod diagnostics;
 #[path = "../glass.rs"]
 mod glass;
 #[path = "../i18n.rs"]
 mod i18n;
+#[path = "../window.rs"]
+mod window;
 slint::include_modules!();
 
 #[derive(Default)]
@@ -392,6 +396,12 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     );
     ui.set_launch_candidate(selected.is_some_and(|g| g.installation_hint));
     ui.set_import_candidate(selected.is_some_and(|g| g.copy_candidate));
+    ui.set_import_modded(
+        selected
+            .and_then(|g| g.copy_source.as_ref())
+            .and_then(|s| s.loader())
+            .is_some(),
+    );
     ui.set_import_shared(
         selected.is_some_and(|g| g.isolation == ambrum::library::Isolation::Shared),
     );
@@ -399,6 +409,31 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     ui.set_busy(model.busy());
     ui.set_running(model.running);
     ui.set_status(tr(&model.status));
+    ui.set_status_help(
+        if model.busy() {
+            ""
+        } else {
+            diagnostics::help(english, &model.status)
+        }
+        .into(),
+    );
+    ui.set_network_help(diagnostics::help(english, &model.network.status).into());
+    ui.set_update_available(model.update.is_some());
+    ui.set_update_info(match &model.update {
+        Some(release) => format!(
+            "AmberL {} · {:.1} MiB\nSHA-256: {}",
+            release.version,
+            release.bytes as f64 / 1048576.0,
+            release.sha256
+        )
+        .into(),
+        None if model.update_checked => i18n::text(english, "暂无可用的新正式版本").into(),
+        None => i18n::text(
+            english,
+            "仅手动检查 AmberL 官方正式版本；不会自动下载或安装。",
+        )
+        .into(),
+    });
     ui.set_task_log(model.log().into());
     ui.set_device_prompt(i18n::device_prompt(english, &model.device_prompt).into());
     view.revision = model.revision;
@@ -908,9 +943,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         PathBuf::from(ui.get_import_parent().as_str()),
                         ui.get_import_name().to_string(),
                         ui.get_import_acknowledged(),
+                        ui.get_import_mods_acknowledged(),
+                        PathBuf::from(ui.get_java_path().as_str()),
                         os.clone(),
                     )
                 });
+            }
+        });
+    }
+    {
+        let model = model.clone();
+        ui.on_check_update(move || operation(&model, |m| m.check_update()));
+    }
+    {
+        let model = model.clone();
+        ui.on_open_release(move || {
+            let page = model.borrow().update.as_ref().map(|r| r.page.clone());
+            if let Some(page) = page {
+                operation(&model, |_| open(&page));
             }
         });
     }
@@ -1209,18 +1259,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let timer = slint::Timer::default();
     {
         let weak = ui.as_weak();
+        let fitted = std::cell::Cell::new(false);
         timer.start(
             slint::TimerMode::Repeated,
             Duration::from_millis(75),
             move || {
                 model.borrow_mut().tick();
                 if let Some(ui) = weak.upgrade() {
+                    // Winit creates its native window only after entering the event loop.
+                    if !fitted.get() {
+                        fitted.set(window::fit(ui.window()));
+                    }
                     refresh(&ui, &model.borrow(), &mut view.borrow_mut());
                 }
             },
         );
     }
-    ui.run()?;
+    ui.show()?;
+    slint::run_event_loop()?;
     Ok(())
 }
 fn main() {

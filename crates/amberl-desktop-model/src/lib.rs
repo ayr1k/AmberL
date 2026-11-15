@@ -76,6 +76,7 @@ impl LaunchChoice {
     }
 }
 enum Message {
+    Update(Option<ambrum::updates::Release>),
     Maintenance(maintenance::Response),
     Content(content::Response),
     Data(Vec<Game>, Vec<Profile>),
@@ -88,6 +89,7 @@ enum Message {
     Finished(Result<()>),
 }
 enum Operation {
+    CheckUpdate,
     Import(import::Request),
     Maintenance(maintenance::Request),
     Content(content::Request),
@@ -128,6 +130,8 @@ pub struct Model {
     pub catalog_revision: u64,
     pub selected: Option<String>,
     pub status: String,
+    pub update_checked: bool,
+    pub update: Option<ambrum::updates::Release>,
     pub device_prompt: String,
     pub revision: u64,
     pub data_revision: u64,
@@ -168,6 +172,8 @@ impl Model {
             selected,
             preferences,
             status: saved.err().unwrap_or_default(),
+            update_checked: false,
+            update: None,
             device_prompt: String::new(),
             revision: 1,
             data_revision: 1,
@@ -223,6 +229,9 @@ impl Model {
             self.log.push_back(message);
         }
         self.revision += 1;
+    }
+    pub fn check_update(&mut self) -> Result<()> {
+        self.start(Operation::CheckUpdate)
     }
     pub fn reload(&mut self) -> Result<()> {
         self.start(Operation::Reload)
@@ -370,6 +379,14 @@ impl Model {
                 }
             };
             match message {
+                Message::Update(release) => {
+                    if worker.cancel.check().is_err() {
+                        continue;
+                    }
+                    self.update = release;
+                    self.update_checked = true;
+                    self.revision += 1;
+                }
                 Message::Maintenance(response) => {
                     if worker.cancel.check().is_err() {
                         continue;
@@ -541,13 +558,20 @@ fn reload(
                         copy_source,
                         isolation: instance.isolation,
                         details: format!(
-                            "{}\n{}\n{}\n{}",
+                            "{}\n{}\n{}\n{}\n{}",
                             entry.path.display(),
                             instance.game_dir.as_ref().map_or_else(
                                 || "游戏数据位置未确认".into(),
                                 |p| p.display().to_string()
                             ),
                             instance.evidence.join(" · "),
+                            instance.loader_choice.as_ref().map_or_else(
+                                || instance.loader.clone(),
+                                |choice| format!(
+                                    "{} {} / Minecraft {}",
+                                    choice.kind, choice.version, instance.game
+                                )
+                            ),
                             instance.issue.as_deref().unwrap_or("")
                         ),
                         subtitle: format!(
@@ -587,6 +611,13 @@ fn execute(
     sender: &mpsc::SyncSender<Message>,
 ) -> Result<()> {
     match operation {
+        Operation::CheckUpdate => {
+            send(sender, Message::Status("正在检查 AmberL 正式版本…".into()))?;
+            send(
+                sender,
+                Message::Update(ambrum::updates::check(&ambrum::download::Https, cancel)?),
+            )
+        }
         Operation::Import(request) => import::execute(app, request, cancel, sender),
         Operation::Maintenance(request) => maintenance::execute(app, request, cancel, sender),
         Operation::Reload => reload(app, cancel, sender),
