@@ -1,6 +1,17 @@
 # First-version completion ledger / 首版完成清单
 
 
+## Latest download refinement (manual acceptance pending)
+
+The user reported very slow and failed in-launcher game/Java downloads. Serial
+requests, per-file sessions, five-second timeouts and absent transient retries were
+identified in source. The new bounded parallel queue, session reuse, retries and
+throughput display are described in [DOWNLOADS.md](DOWNLOADS.md). This revision is
+**build/package only**, without tests or benchmark claims. The same manual-only CI
+trailer applies. Previous evidence does not certify these download changes.
+
+本轮下载优化未运行测试，由用户手动验收；不合并、不发布正式版。
+
 ## Current candidate: user-requested manual acceptance only
 
 Latest instruction supersedes the automated-verification direction below: **do not

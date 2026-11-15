@@ -3,9 +3,11 @@
 use super::{Algorithm, Transport};
 use crate::Result;
 use std::{
+    cell::RefCell,
     ffi::c_void,
     io::{self, Read},
     ptr::{null, null_mut},
+    rc::Rc,
 };
 use windows_sys::Win32::{Networking::WinHttp::*, Security::Cryptography::*};
 fn wide(s: &str) -> Vec<u16> {
@@ -100,10 +102,19 @@ impl Transport for Https {
     fn open(&self, url: &str) -> Result<Box<dyn Read>> {
         request(url, false)
     }
+    fn worker(&self) -> Option<Box<dyn Transport + Send>> {
+        Some(Box::new(Https))
+    }
+    fn retries(&self) -> usize {
+        2
+    }
 }
 /// One anonymous redirect for pinned networking release bytes, never for account traffic.
 pub(crate) struct GithubRelease;
 impl Transport for GithubRelease {
+    fn retries(&self) -> usize {
+        2
+    }
     fn open(&self, url: &str) -> Result<Box<dyn Read>> {
         if ![
             "https://github.com/EasyTier/EasyTier/releases/download/",
@@ -124,17 +135,33 @@ fn asset_redirect(url: &str) -> Result<()> {
     }
     Ok(())
 }
+thread_local! { static SESSION: RefCell<Option<Rc<Handle>>> = const { RefCell::new(None) }; }
+fn session() -> Result<Rc<Handle>> {
+    SESSION.with(|slot| {
+        if let Some(session) = slot.borrow().as_ref() {
+            return Ok(session.clone());
+        }
+        let session = unsafe {
+            Handle::new(WinHttpOpen(
+                wide("AmberL/0.1 (https://github.com/ayr1k/AmberL)").as_ptr(),
+                WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                null(),
+                null(),
+                0,
+            ))?
+        };
+        unsafe {
+            checked(WinHttpSetTimeouts(session.0, 15000, 15000, 15000, 30000))?;
+        }
+        let session = Rc::new(session);
+        *slot.borrow_mut() = Some(session.clone());
+        Ok(session)
+    })
+}
 fn request(url: &str, github_redirect: bool) -> Result<Box<dyn Read>> {
     let url = Https::parse(url)?;
     unsafe {
-        let session = Handle::new(WinHttpOpen(
-            wide("AmberL/0.1 (https://github.com/ayr1k/AmberL)").as_ptr(),
-            WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-            null(),
-            null(),
-            0,
-        ))?;
-        checked(WinHttpSetTimeouts(session.0, 5000, 5000, 5000, 5000))?;
+        let session = session()?;
         let connection = Handle::new(WinHttpConnect(session.0, url.host.as_ptr(), url.port, 0))?;
         let request = Handle::new(WinHttpOpenRequest(
             connection.0,
@@ -194,7 +221,7 @@ fn request(url: &str, github_redirect: bool) -> Result<Box<dyn Read>> {
         }
         if status != 200 {
             return Err(format!(
-                "下载服务返回 HTTP {status}，未保存；重定向尚未支持 / HTTP {status} rejected"
+                "下载服务返回 HTTP {status}，文件未提交 / HTTP {status} rejected"
             ));
         }
         Ok(Box::new(Response {
@@ -208,7 +235,7 @@ fn request(url: &str, github_redirect: bool) -> Result<Box<dyn Read>> {
 struct Response {
     request: Handle,
     _connection: Handle,
-    _session: Handle,
+    _session: Rc<Handle>,
 }
 impl Read for Response {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {

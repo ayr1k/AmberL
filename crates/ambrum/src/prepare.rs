@@ -24,6 +24,7 @@ pub struct Progress {
     /// Unknown until the verified asset index has been parsed and the full plan checked.
     pub total_files: Option<usize>,
     pub resource: Option<ResourceProgress>,
+    pub transfer: Option<crate::download::BatchProgress>,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,8 +62,8 @@ fn resources<'a>(
     Ok(unique)
 }
 
-/// The byte budget covers unique resources, including existing cache hits. No network
-/// retry is automatic. A repeated call revalidates and reuses already committed files.
+/// The byte budget covers unique resources, including existing cache hits. Transient network
+/// failures receive bounded retries. Repeated calls reuse verified committed files.
 pub fn vanilla(
     cache: &Cache,
     metadata: &Value,
@@ -90,6 +91,7 @@ pub fn vanilla(
             verified_files: 0,
             total_files: None,
             resource: Some(resource),
+            transfer: None,
         })
     })?;
     let assets = AssetPlan::parse(&cache.read_json(index, cancel)?)?;
@@ -110,29 +112,30 @@ pub fn vanilla(
         logical_files: plan.files.len() + assets.files.len(),
         asset_mappings: assets.mappings.len(),
     };
-    for (key, artifact) in all {
-        cancel.check()?;
-        if key == index_key {
-            continue;
-        }
-        let downloaded = cache.fetch(&artifact, transport, cancel, |resource| {
-            progress(Progress {
-                phase: Phase::Resources,
-                verified_files: result.verified_files,
-                total_files: Some(total),
-                resource: Some(resource),
-            })
-        })?;
-        result.verified_files += 1;
-        result.verified_bytes += downloaded.size;
-        result.cache_hits += usize::from(downloaded.cache_hit);
-    }
+    let files: Vec<_> = all
+        .into_iter()
+        .filter(|(key, _)| key != &index_key)
+        .map(|(_, a)| a)
+        .collect();
+    let downloaded = cache.fetch_many(&files, transport, cancel, |transfer, resource| {
+        progress(Progress {
+            phase: Phase::Resources,
+            verified_files: transfer.verified_files + 1,
+            total_files: Some(total),
+            resource,
+            transfer: Some(transfer),
+        });
+    })?;
+    result.verified_files += downloaded.verified_files;
+    result.verified_bytes += downloaded.verified_bytes;
+    result.cache_hits += downloaded.cache_hits;
     cancel.check()?;
     progress(Progress {
         phase: Phase::Complete,
         verified_files: total,
         total_files: Some(total),
         resource: None,
+        transfer: None,
     });
     Ok(result)
 }

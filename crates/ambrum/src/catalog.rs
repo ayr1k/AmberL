@@ -30,6 +30,21 @@ pub(crate) fn bounded(
     url: &str,
     cancel: &Cancellation,
 ) -> Result<Vec<u8>> {
+    for attempt in 0..=transport.retries().min(2) {
+        match bounded_once(transport, url, cancel) {
+            Ok(bytes) => return Ok(bytes),
+            Err(error) => {
+                cancel.check()?;
+                if attempt == transport.retries().min(2) || !crate::download::transient(&error) {
+                    return Err(error);
+                }
+                crate::download::backoff(attempt, cancel)?;
+            }
+        }
+    }
+    unreachable!()
+}
+fn bounded_once(transport: &impl Transport, url: &str, cancel: &Cancellation) -> Result<Vec<u8>> {
     cancel.check()?;
     let started = Instant::now();
     let mut input = transport.open(url)?;
@@ -40,9 +55,12 @@ pub(crate) fn bounded(
         if started.elapsed() > Duration::from_secs(60) {
             return Err("Version discovery deadline exceeded".into());
         }
-        let n = input
-            .read(&mut buffer)
-            .map_err(|_| "Version metadata download interrupted")?;
+        let n = input.read(&mut buffer).map_err(|e| {
+            format!(
+                "下载中断 / Download interrupted (Windows {})",
+                e.raw_os_error().unwrap_or(0)
+            )
+        })?;
         if n == 0 {
             break;
         }

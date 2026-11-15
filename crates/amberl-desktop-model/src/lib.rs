@@ -771,6 +771,18 @@ fn reload(
     cancel.check()?;
     send(sender, Message::Data(games, accounts))
 }
+fn download_status(label: &str, p: ambrum::download::BatchProgress) -> String {
+    format!(
+        "{label} · 已校验 {}/{} 个文件 · {:.1}/{:.1} MiB · 平均 {:.2} MiB/s · 重试 {} 次",
+        p.verified_files,
+        p.total_files,
+        p.verified_bytes as f64 / 1048576.0,
+        p.total_bytes as f64 / 1048576.0,
+        p.bytes_per_second as f64 / 1048576.0,
+        p.retries
+    )
+}
+
 fn execute(
     app: &std::path::Path,
     operation: Operation,
@@ -816,11 +828,18 @@ fn execute(
             send(sender, Message::Java(rows))
         }
         Operation::InstallJava(major) => {
-            ambrum::java::runtime::install(app, major, cancel, |done, total| {
-                let _ = sender.try_send(Message::Status(format!(
-                    "正在下载并校验 Java {major}：{done}/{total}"
-                )));
+            let mut last = Instant::now() - Duration::from_secs(1);
+            ambrum::java::runtime::install_with_progress(app, major, cancel, |p| {
+                if last.elapsed() >= Duration::from_millis(200) || p.verified_files == p.total_files
+                {
+                    last = Instant::now();
+                    let _ = sender.try_send(Message::Status(download_status(
+                        &format!("Java {major}"),
+                        p,
+                    )));
+                }
             })?;
+            send(sender, Message::Status("Java 运行环境已安装并校验".into()))?;
             let mut rows = ambrum::java::runtime::discover(app, cancel)?;
             rows.extend(ambrum::java::discover(cancel)?);
             send(sender, Message::Java(rows))
@@ -953,14 +972,19 @@ fn execute(
                 |progress| {
                     if last.elapsed() >= Duration::from_millis(200) {
                         last = Instant::now();
-                        let _ = sender.try_send(Message::Status(format!(
-                            "下载与校验：{} / {} 个文件",
-                            progress.verified_files,
-                            progress
-                                .total_files
-                                .map(|n| n.to_string())
-                                .unwrap_or_else(|| "待计算".into())
-                        )));
+                        let status = if let Some(transfer) = progress.transfer {
+                            download_status("Minecraft", transfer)
+                        } else {
+                            format!(
+                                "下载与校验：{} / {} 个文件",
+                                progress.verified_files,
+                                progress
+                                    .total_files
+                                    .map(|n| n.to_string())
+                                    .unwrap_or_else(|| "待计算".into())
+                            )
+                        };
+                        let _ = sender.try_send(Message::Status(status));
                     }
                 },
             )?;

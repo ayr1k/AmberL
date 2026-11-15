@@ -118,6 +118,16 @@ pub fn install(
     cancel: &Cancellation,
     mut progress: impl FnMut(usize, usize),
 ) -> Result<PathBuf> {
+    install_with_progress(app, major, cancel, |p| {
+        progress(p.verified_files, p.total_files)
+    })
+}
+pub fn install_with_progress(
+    app: &Path,
+    major: u32,
+    cancel: &Cancellation,
+    mut progress: impl FnMut(crate::download::BatchProgress),
+) -> Result<PathBuf> {
     let key = component(major)?;
     let mut doc = Document::<Data>::open(app, "java-runtimes-v1.json")?;
     if doc.data.runtimes.len() >= 32 {
@@ -140,6 +150,8 @@ pub fn install(
     let files = resources(
         &serde_json::from_slice::<Value>(&bytes).map_err(|_| "Invalid runtime manifest")?,
     )?;
+    let downloads: Vec<_> = files.iter().map(|f| f.artifact.clone()).collect();
+    cache.fetch_many(&downloads, &Https, cancel, |p, _| progress(p))?;
     let parent = app.join("java-runtimes");
     match fs::create_dir(&parent) {
         Ok(()) => {}
@@ -151,9 +163,8 @@ pub fn install(
     let stage = parent.join(format!("stage-{id}"));
     fs::create_dir(&stage).map_err(|e| e.to_string())?;
     let stage_guard = DirectoryGuard::open(&stage)?;
-    for (index, f) in files.iter().enumerate() {
+    for f in &files {
         cancel.check()?;
-        cache.fetch(&f.artifact, &Https, cancel, |_| {})?;
         let target = stage.join(&f.path);
         let parent = target.parent().ok_or("Missing Java parent")?;
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -167,7 +178,6 @@ pub fn install(
             .and_then(|_| out.flush())
             .and_then(|_| out.sync_all())
             .map_err(|e| e.to_string())?;
-        progress(index + 1, files.len());
     }
     cancel.check()?;
     drop(stage_guard);

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Verified app-cache downloads. No game-directory writes, archive extraction or auth.
+mod batch;
 pub(crate) mod windows;
 use crate::{
     Result,
     registry::{DirectoryGuard, info, new_id, options},
     task::Cancellation,
 };
+pub use batch::{BatchProgress, BatchResult};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -72,11 +74,19 @@ impl Artifact {
 /// Injectable streaming transport. Production uses platform HTTPS; tests inject failures.
 pub trait Transport {
     fn open(&self, url: &str) -> Result<Box<dyn Read>>;
+    /// Production anonymous downloads can provide independent worker transports.
+    fn worker(&self) -> Option<Box<dyn Transport + Send>> {
+        None
+    }
+    fn retries(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Phase {
     CheckingCache,
+    Retrying,
     Downloading,
     Verifying,
     Complete,
@@ -215,12 +225,38 @@ impl Cache {
         })
     }
 
-    /// One attempt. Retry explicitly with the same descriptor after a reported failure.
+    /// Bounded retries for transient transport failures only. Verified files are reused.
     /// Commit is the success boundary; cancellation before it never replaces a good file.
     pub fn fetch(
         &self,
         artifact: &Artifact,
-        transport: &impl Transport,
+        transport: &(impl Transport + ?Sized),
+        cancel: &Cancellation,
+        mut progress: impl FnMut(Progress),
+    ) -> Result<Downloaded> {
+        for attempt in 0..=transport.retries().min(2) {
+            match self.fetch_once(artifact, transport, cancel, &mut progress) {
+                Ok(file) => return Ok(file),
+                Err(error) => {
+                    cancel.check()?;
+                    if attempt == transport.retries().min(2) || !transient(&error) {
+                        return Err(error);
+                    }
+                    progress(Progress {
+                        phase: Phase::Retrying,
+                        received: 0,
+                        total: artifact.size,
+                    });
+                    backoff(attempt, cancel)?;
+                }
+            }
+        }
+        unreachable!()
+    }
+    fn fetch_once(
+        &self,
+        artifact: &Artifact,
+        transport: &(impl Transport + ?Sized),
         cancel: &Cancellation,
         mut progress: impl FnMut(Progress),
     ) -> Result<Downloaded> {
@@ -322,8 +358,11 @@ impl Cache {
         });
         loop {
             check()?;
-            let n = response.read(&mut buffer).map_err(|_| {
-                "下载中断，可重试；未提交文件 / Download interrupted; retry available".to_string()
+            let n = response.read(&mut buffer).map_err(|e| {
+                format!(
+                    "下载中断，未提交文件 / Download interrupted (Windows {})",
+                    e.raw_os_error().unwrap_or(0)
+                )
             })?;
             check()?;
             if n == 0 {
@@ -357,6 +396,9 @@ impl Cache {
             total: artifact.size,
         });
         check()?;
+        if received < artifact.size {
+            return Err("下载未完成，已完成的其他文件保留 / Download truncated".into());
+        }
         if received != artifact.size || !hash.finish()?.eq_ignore_ascii_case(&artifact.digest) {
             return Err(
                 "大小或校验不符，未提交；可更换来源后重试 / Artifact verification failed".into(),
@@ -399,6 +441,24 @@ impl Cache {
             size: received,
         })
     }
+}
+
+pub(crate) fn transient(error: &str) -> bool {
+    error.ends_with(" / Download truncated")
+        || [12002, 12007, 12029, 12030, 12031].iter().any(|code| {
+            error.ends_with(&format!("HTTPS failed (Windows {code})"))
+                || error.ends_with(&format!("Download interrupted (Windows {code})"))
+        })
+        || [408, 429, 500, 502, 503, 504]
+            .iter()
+            .any(|code| error.ends_with(&format!(" / HTTP {code} rejected")))
+}
+pub(crate) fn backoff(attempt: usize, cancel: &Cancellation) -> Result<()> {
+    for _ in 0..(10 * (attempt + 1)) {
+        cancel.check()?;
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    cancel.check()
 }
 
 struct Temporary {

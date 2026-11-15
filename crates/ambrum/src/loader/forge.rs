@@ -203,19 +203,32 @@ pub(super) fn profile(
     if !hash.finish()?.eq_ignore_ascii_case(&installer.digest) {
         return Err("Installer checksum changed".into());
     }
-    let mut bytes = installer.size;
-    for f in plan
+    let seeds: Vec<_> = plan
         .files
         .iter()
         .filter(|f| matches!(f.role, "client" | "library"))
-    {
+        .collect();
+    let mut bytes = installer.size;
+    for f in &seeds {
         bytes = bytes
             .checked_add(f.artifact.size)
             .ok_or("Installer budget overflow")?;
         if bytes > budget {
             return Err("Installer seed exceeds budget".into());
         }
-        cache.fetch(&f.artifact, net, cancel, |_| {})?;
+    }
+    cache.fetch_many(
+        &seeds.iter().map(|f| f.artifact.clone()).collect::<Vec<_>>(),
+        net,
+        cancel,
+        |_, _| {},
+    )?;
+
+    for f in plan
+        .files
+        .iter()
+        .filter(|f| matches!(f.role, "client" | "library"))
+    {
         write_new(
             &work,
             &f.path,

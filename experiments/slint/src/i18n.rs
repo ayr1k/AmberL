@@ -5,6 +5,7 @@ pub fn text(english: bool, value: &str) -> &str {
         return value;
     }
     match value {
+        "Java 运行环境已安装并校验" => "Java runtime installed and verified",
         "设备码已复制" => "Device code copied",
         "复制失败，请点击复制设备码重试" => {
             "Copy failed. Use Copy device code to retry."
@@ -119,6 +120,16 @@ pub fn text(english: bool, value: &str) -> &str {
 pub fn message(english: bool, value: &str) -> String {
     if !english {
         return value.into();
+    }
+    if (value.starts_with("Minecraft · ") || value.starts_with("Java "))
+        && value.contains(" · 已校验 ")
+    {
+        return value
+            .replace(" · 已校验 ", " · Verified ")
+            .replace(" 个文件", " files")
+            .replace(" · 平均 ", " · Average ")
+            .replace(" · 重试 ", " · Retries ")
+            .replace(" 次", "");
     }
     for (prefix, suffix, before, after) in [
         (

@@ -51,6 +51,7 @@ Source: "{#PackageRoot}\FRP.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\IMPORT.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\INSTANCE-RECOVERY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageRoot}\UPDATES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\DOWNLOADS.md"; DestDir: "{app}"; Flags: ignoreversion
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 [Icons]

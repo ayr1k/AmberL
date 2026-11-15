@@ -5,16 +5,25 @@ use std::sync::{
 };
 
 #[derive(Clone, Default)]
-pub struct Cancellation(Arc<AtomicBool>);
+pub struct Cancellation {
+    flag: Arc<AtomicBool>,
+    parent: Option<Arc<Cancellation>>,
+}
 impl Cancellation {
     pub fn cancel(&self) {
-        self.0.store(true, Ordering::Release);
+        self.flag.store(true, Ordering::Release);
     }
     pub fn check(&self) -> crate::Result<()> {
-        if self.0.load(Ordering::Acquire) {
+        if self.flag.load(Ordering::Acquire) {
             Err("操作已取消 / Cancelled".into())
         } else {
-            Ok(())
+            self.parent.as_ref().map_or(Ok(()), |p| p.check())
+        }
+    }
+    pub(crate) fn child(&self) -> Self {
+        Self {
+            flag: Arc::default(),
+            parent: Some(Arc::new(self.clone())),
         }
     }
 }
