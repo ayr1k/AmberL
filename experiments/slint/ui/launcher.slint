@@ -1022,7 +1022,7 @@ export component Launcher inherits Window {
                 Text { text: @tr("模组下载") + " · " + root.content-project-title; color: Theme.text; font-size: 22px; font-weight: 600; vertical-stretch: 0; overflow: elide; }
                 Text { text: @tr("下载到当前实例") + " · " + root.content-target; color: Theme.accent; font-size: 13px; vertical-stretch: 0; }
                 if !root.content-server: Text {text:root.content-destination;color:Theme.secondary;font-size:12px;vertical-stretch:0;overflow:elide;}
-                ScrollView { height: max(160px,parent.height - 180px); content-width: self.width;
+                ScrollView { min-height: 80px; vertical-stretch: 1; content-width: self.width;
                     VerticalLayout { spacing: 10px; alignment: start;
                         Text { text: root.content-plan-summary; color: Theme.text; font-weight: 600; vertical-stretch: 0; }
                         for file in root.content-plan-files: Rectangle { height: 58px; background: Theme.control; border-radius: Theme.radius;
