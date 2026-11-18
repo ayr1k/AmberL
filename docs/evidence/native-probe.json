@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "executable_sha256": "591779A05B93AF24DBEE1929B7D38634777EA4FB2AA6F4ABBEDDD0675A54AB09",
+  "fixture_profiles": 120,
+  "library_id": "047a9662057240538b105101357ebca3",
+  "checks": [
+    "120 synthetic profiles scanned in actual native controls",
+    "Filtering and keyboard row selection update details",
+    "Editing the path invalidates attachment until a fresh scan succeeds",
+    "Attach, normal exit, restart and registered scan preserve the same library ID",
+    "Small/large window resize and page switching respond without crashing (not visual/DPI acceptance)",
+    "Detach preserves every fixture file path and SHA-256"
+  ],
+  "limitations": "Hidden-window message automation; not real IME, accessibility, rendered layout, DPI, game or user acceptance."
+}

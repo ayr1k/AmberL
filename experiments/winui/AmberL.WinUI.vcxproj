@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5E51F8ED-3459-4A33-821F-931BAC859D21}</ProjectGuid>
+    <ProjectName>AmberL.WinUI</ProjectName>
+    <RootNamespace>AmberL.WinUI</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
+    <AppContainerApplication>false</AppContainerApplication><DesktopCompatible>true</DesktopCompatible>
+    <UseWinUI>true</UseWinUI><WindowsPackageType>None</WindowsPackageType><AppxPackage>false</AppxPackage>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
+    <CppWinRTOptimized>true</CppWinRTOptimized>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
+    <NuGetTargetPlatformIdentifier>Windows</NuGetTargetPlatformIdentifier>
+    <NuGetTargetPlatformVersion>$(WindowsTargetPlatformVersion)</NuGetTargetPlatformVersion>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\local\nuget</RestorePackagesPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\local\winui-obj\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations"><ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration></ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType><PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet><UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(MSBuildThisFileDirectory)..\..\local\ui-build\winui\</OutDir>
+    <IntDir>$(BaseIntermediateOutputPath)Release\</IntDir><TargetName>amberl-winui-probe</TargetName>
+    <LinkIncremental>false</LinkIncremental><ProjectPriFileName>resources.pri</ProjectPriFileName>
+    <CppWinRTGenerateWindowsMetadata>false</CppWinRTGenerateWindowsMetadata>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><LanguageStandard>stdcpp20</LanguageStandard><WarningLevel>Level4</WarningLevel><AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions><PrecompiledHeader>NotUsing</PrecompiledHeader><RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary><PreprocessorDefinitions>NDEBUG;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <Link><SubSystem>Windows</SubSystem><AdditionalDependencies>windowsapp.lib;ole32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies><OptimizeReferences>true</OptimizeReferences><EnableCOMDATFolding>true</EnableCOMDATFolding></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="[2.6.5]" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="[2.6.5]" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="[3.0.260818.1]" />
+    <!-- WinUI's metadata includes optional WebView2 types. Reference metadata only;
+         this sample does not instantiate or host a WebView/browser runtime. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="[1.0.3719.77]" PrivateAssets="all" />
+    <Reference Include="Microsoft.Web.WebView2.Core"><HintPath>$(RestorePackagesPath)\microsoft.web.webview2\1.0.3719.77\lib\Microsoft.Web.WebView2.Core.winmd</HintPath><IsWinMDFile>true</IsWinMDFile><Private>false</Private></Reference>
+    <Manifest Include="app.manifest" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyAmbrumBridge" AfterTargets="Build"><Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\target\release\amberl_ui_bridge.dll" DestinationFolder="$(OutDir)" /></Target>
+</Project>
