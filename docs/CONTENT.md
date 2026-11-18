@@ -74,3 +74,40 @@ any valid existing nonpreset allocation is retained as an additional choice.
 项目与已安装内容均提供列表、搜索/筛选与翻页，项目另有简介、作者、下载量和图标。
 内存改为常用值列表，下拉框鼠标点击后不保留亮色焦点框，键盘焦点仍可见。
 本候选仅编译打包，未运行功能测试、界面测试、网络请求验收或性能测量；由用户手测。
+
+## 2026-11-18 candidate: version and dependency cards
+
+The permanent top navigation includes **资源 / Content**, and the current client content destination is shown on the page/confirmation panel. Project rows and version
+rows display **已下载 / Downloaded** for the current target's managed content. The
+snapshot verifies the recorded files' actual size/hash before assigning badges;
+missing/changed files and same-name unmanaged files do not get this badge. Project
+badges mean at least one verified version; version badges require the exact version.
+All managed dependency files are included, not only root projects.
+
+Version selection is a compact recommended card plus expandable Minecraft-version
+groups. Recommendation prefers compatible featured stable releases, then compatible
+stable releases, then the newest compatible version. The initial selection follows
+this recommendation. Unpinned dependencies prefer an already verified compatible
+version in the current target before choosing another stable release. Broader discovery filters do not permit incompatible installs.
+
+The confirmation panel shows the selected version and separate required/optional
+dependency cards. Required dependencies start checked; optional ones start unchecked.
+Users may change either. Each change regenerates the plan (including transitives),
+with shared anonymous project/version metadata cached for at most 120 seconds,
+128 entries/16 MiB. Explicit list refresh clears this cache. File sizes/hashes and
+actual target ownership are still checked by the existing install path.
+
+Unchecking required dependencies is an explicit opt-out, not a compatibility pass.
+The UI warns about possible startup failure, and the installed group retains the
+omitted dependency titles. They are not silently re-added. Dependencies required by
+other selected branches can still be included; the displayed final file count/bytes
+reflects the resulting graph. Already verified shared files are reused, not downloaded
+again. Modified/unmanaged files continue to block overwrites.
+
+Thumbnails now support PNG/JPEG/WebP/GIF with bounded decode and retry attempts.
+They remain optional; network failures, unsupported or oversized images use the
+fallback. No actual provider/network or UI test was run for this candidate.
+
+本轮按 HMCL 参考图重做紧凑的版本分组与依赖确认页，默认选中推荐版本。必要、可选
+依赖均可勾选；取消必要依赖会显示启动风险，并记录到安装组详情。当前实例中已校验
+的托管依赖会标为“已下载”，同名未托管文件不会冒充已识别内容。全部行为待手动验收。

@@ -11,6 +11,7 @@ pub struct Content {
     pub projects: Vec<api::Project>,
     pub versions: Vec<api::Version>,
     pub groups: Vec<content::Group>,
+    pub downloaded: Vec<(String, String)>,
     pub plan: Option<api::Plan>,
     pub planned_version: String,
     pub query: String,
@@ -30,16 +31,17 @@ pub(super) enum Request {
         String,
         String,
         std::collections::BTreeSet<String>,
+        std::collections::BTreeSet<String>,
     ),
     Install(content::Target, api::Plan),
     Change(content::Target, String, String),
 }
 pub(super) enum Response {
-    Open(api::Context, Vec<content::Group>),
+    Open(api::Context, Vec<content::Group>, Vec<(String, String)>),
     Projects(String, String, api::SearchPage),
     Versions(Vec<api::Version>),
     Plan(String, api::Plan),
-    Groups(Vec<content::Group>),
+    Groups(Vec<content::Group>, Vec<(String, String)>),
 }
 impl Content {
     pub fn preview(&self) -> String {
@@ -64,7 +66,8 @@ impl Content {
     }
     pub(super) fn apply(&mut self, response: Response) {
         match response {
-            Response::Open(context, groups) => {
+            Response::Open(context, groups, downloaded) => {
+                self.downloaded = downloaded;
                 self.kind = if context.server && context.loader == "paper" {
                     "plugin"
                 } else if context.loader == "vanilla" {
@@ -100,7 +103,10 @@ impl Content {
                 self.plan = Some(plan);
                 self.planned_version = version;
             }
-            Response::Groups(rows) => self.groups = rows,
+            Response::Groups(rows, downloaded) => {
+                self.groups = rows;
+                self.downloaded = downloaded;
+            }
         }
         self.revision += 1;
     }
@@ -156,6 +162,7 @@ impl Model {
         let target = self.content_target()?;
         self.start(Operation::Content(Request::Open(target)))?;
         self.content.cache.clear();
+        api::clear_metadata_cache();
         self.content.query.clear();
         self.content.sort = "relevance".into();
         self.content.offset = 0;
@@ -253,6 +260,7 @@ impl Model {
             self.content.kind.clone(),
             v.id.clone(),
             Default::default(),
+            Default::default(),
         )))?;
         self.content.plan = None;
         self.content.planned_version.clear();
@@ -295,11 +303,44 @@ impl Model {
             self.content.kind.clone(),
             self.content.planned_version.clone(),
             choices,
+            plan.required
+                .iter()
+                .filter(|r| !r.selected)
+                .map(|r| r.key.clone())
+                .collect(),
         )))?;
-        self.content.plan = None;
-        self.content.planned_version.clear();
-        self.content.revision += 1;
         Ok(())
+    }
+    pub fn select_required_content(&mut self, index: i32, selected: bool) -> Result<()> {
+        let plan = self.content.plan.as_ref().ok_or("请先预览依赖")?;
+        let row = plan
+            .required
+            .get(usize::try_from(index).map_err(|_| "请选择依赖")?)
+            .ok_or("依赖选择已变化")?;
+        let mut excluded = plan
+            .required
+            .iter()
+            .filter(|r| !r.selected)
+            .map(|r| r.key.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        if selected {
+            excluded.remove(&row.key);
+        } else {
+            excluded.insert(row.key.clone());
+        }
+        let choices = plan
+            .optional
+            .iter()
+            .filter(|r| r.selected)
+            .map(|r| r.key.clone())
+            .collect();
+        self.start(Operation::Content(Request::Plan(
+            self.content_target()?,
+            self.content.kind.clone(),
+            self.content.planned_version.clone(),
+            choices,
+            excluded,
+        )))
     }
     pub fn change_content(&mut self, index: i32, action: String) -> Result<()> {
         let g = self
@@ -322,7 +363,7 @@ pub(super) fn execute(
 ) -> Result<()> {
     let response = match request {
         Request::Open(t) => {
-            let (context, groups) = content::snapshot(app, &t, c)?;
+            let (context, groups, downloaded) = content::snapshot(app, &t, c)?;
             let kind = if context.server && context.loader == "paper" {
                 "plugin"
             } else if context.loader == "vanilla" {
@@ -332,7 +373,7 @@ pub(super) fn execute(
             };
             send(
                 sender,
-                Message::Content(Response::Open(context.clone(), groups)),
+                Message::Content(Response::Open(context.clone(), groups, downloaded)),
             )?;
             send(sender, Message::Status("正在加载兼容内容…".into()))?;
             let page = api::search_page(
@@ -358,17 +399,28 @@ pub(super) fn execute(
         Request::Versions(context, kind, id, browse) => {
             Response::Versions(api::versions_with_filters(&id, &kind, &context, browse, c)?)
         }
-        Request::Plan(t, kind, id, choices) => Response::Plan(
-            id.clone(),
-            api::plan_with_choices(&id, &kind, &content::context(app, &t, c)?, &choices, c)?,
-        ),
+        Request::Plan(t, kind, id, choices, excluded) => {
+            let (context, _, installed) = content::snapshot(app, &t, c)?;
+            Response::Plan(
+                id.clone(),
+                api::plan_with_installed_dependencies(
+                    &id, &kind, &context, &choices, &excluded, &installed, c,
+                )?,
+            )
+        }
         Request::Install(t, plan) => {
             content::install(app, &t, &plan, c)?;
-            Response::Groups(content::list(app, &t, c)?)
+            {
+                let (_, groups, downloaded) = content::snapshot(app, &t, c)?;
+                Response::Groups(groups, downloaded)
+            }
         }
         Request::Change(t, id, action) => {
             content::change(app, &t, &id, &action, c)?;
-            Response::Groups(content::list(app, &t, c)?)
+            {
+                let (_, groups, downloaded) = content::snapshot(app, &t, c)?;
+                Response::Groups(groups, downloaded)
+            }
         }
     };
     send(sender, Message::Content(response))

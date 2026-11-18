@@ -50,6 +50,7 @@ fn plan(app: &Path, t: &Target, names: &[&str]) -> modrinth::Plan {
         context: context(app, t, &Cancellation::default()).unwrap(),
         files: names.iter().map(|n| resource(app, n)).collect(),
         optional: vec![],
+        required: vec![],
         incompatible: vec![],
     }
 }

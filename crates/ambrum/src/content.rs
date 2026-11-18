@@ -92,6 +92,8 @@ pub struct Group {
     pub id: String,
     pub title: String,
     pub state: String,
+    #[serde(default)]
+    skipped_required: Vec<String>,
     target: Target,
     object: ObjectId,
     files: Vec<modrinth::File>,
@@ -125,6 +127,7 @@ fn validate(data: &Data) -> Result<()> {
                 .contains(&g.state.as_str())
             || g.files.is_empty()
             || g.files.len() > 128
+            || g.skipped_required.len() > 128
         {
             return Err("Invalid content installation record".into());
         }
@@ -150,18 +153,30 @@ pub fn snapshot(
     app: &Path,
     target: &Target,
     c: &Cancellation,
-) -> Result<(modrinth::Context, Vec<Group>)> {
+) -> Result<(modrinth::Context, Vec<Group>, Vec<(String, String)>)> {
     let root = lease_for(app, target, c, true)?;
     let doc = Document::<Data>::open(app, "content-v1.json")?;
     validate(&doc.data)?;
-    Ok((
-        root.context,
-        doc.data
-            .groups
-            .into_iter()
-            .filter(|g| g.object == root.root.id)
-            .collect(),
-    ))
+    let groups: Vec<_> = doc
+        .data
+        .groups
+        .into_iter()
+        .filter(|g| g.object == root.root.id)
+        .collect();
+    let mut downloaded = std::collections::BTreeSet::new();
+    for g in groups.iter().filter(|g| g.state == "installed") {
+        for f in &g.files {
+            c.check()?;
+            if downloaded.contains(&(f.project.clone(), f.version.clone())) {
+                continue;
+            }
+            if pinned(&root.root.root.join(&f.path), f, c).is_ok() {
+                downloaded.insert((f.project.clone(), f.version.clone()));
+            }
+        }
+    }
+    c.check()?;
+    Ok((root.context, groups, downloaded.into_iter().collect()))
 }
 pub fn list(app: &Path, target: &Target, c: &Cancellation) -> Result<Vec<Group>> {
     Ok(snapshot(app, target, c)?.1)
@@ -171,11 +186,18 @@ impl Group {
         self.files.len()
     }
     pub fn details(&self) -> String {
-        self.files
+        let mut lines = self
+            .files
             .iter()
             .map(|f| format!("{} · {}", f.title, f.path))
-            .collect::<Vec<_>>()
-            .join("\n")
+            .collect::<Vec<_>>();
+        if !self.skipped_required.is_empty() {
+            lines.push(format!(
+                "未下载必要依赖：{}",
+                self.skipped_required.join("、")
+            ));
+        }
+        lines.join("\n")
     }
 }
 fn pinned(path: &Path, f: &modrinth::File, c: &Cancellation) -> Result<fs::File> {
@@ -247,6 +269,12 @@ pub fn install(
             .title
             .clone(),
         state: "pending".into(),
+        skipped_required: plan
+            .required
+            .iter()
+            .filter(|r| !r.selected)
+            .map(|r| r.title.clone())
+            .collect(),
         target: target.clone(),
         object: root.root.id.clone(),
         files: plan.files.clone(),
@@ -308,7 +336,9 @@ pub fn install(
     }
     let cache = Cache::open(app)?;
     for f in &group.files {
-        cache.fetch(&f.artifact, &Https, c, |_| {})?;
+        if !root.root.root.join(&f.path).exists() {
+            cache.fetch(&f.artifact, &Https, c, |_| {})?;
+        }
     }
     doc.data.groups.push(group.clone());
     doc.save()?;

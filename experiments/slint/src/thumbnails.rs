@@ -106,11 +106,30 @@ fn load(url: &str, cancel: &Cancellation) -> Result<(Vec<u8>, u32, u32), String>
     }
     cancel.check()?;
     let mut bytes = vec![];
-    Https
-        .open(url)?
-        .take(512 * 1024 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "Icon unavailable")?;
+    for attempt in 0..3 {
+        cancel.check()?;
+        bytes.clear();
+        let result = Https.open(url).and_then(|input| {
+            input
+                .take(512 * 1024 + 1)
+                .read_to_end(&mut bytes)
+                .map(|_| ())
+                .map_err(|_| "Icon download interrupted".into())
+        });
+        match result {
+            Ok(()) => break,
+            Err(e) => {
+                cancel.check()?;
+                if attempt == 2 {
+                    return Err(e);
+                }
+                for _ in 0..10 {
+                    cancel.check()?;
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
+        }
+    }
     cancel.check()?;
     if bytes.len() > 512 * 1024 {
         return Err("Icon size limit".into());

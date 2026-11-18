@@ -184,3 +184,33 @@ was run for this revision at the user's request.
 
 账户自动选择、安装位置列表、登录取消与设备码复制、任务页和缩放优化待手动验收。
 此前 DPI/界面测试记录仅适用于其标注的旧版本，不证明本次体验已通过。
+
+## 2026-11-18 appearance and control refinement (manual acceptance pending)
+
+The dropdown chevron and minimize/maximize/restore/close controls are SVGs rather
+than font glyphs. Window controls have fixed equal hit areas and icon centers. The
+permanent header is separated from page bodies; drag regions avoid its navigation.
+The approved AMBER vector artwork is retained with AmberL's teal center/L, replacing
+the small lockup bitmap. Input/action controls use one 8 px radius token; the editable
+fields retain Slint TextInput IME/selection/undo/clipboard and keyboard behavior.
+
+Starting a new installation clears wizard step, selected version/loader and naming
+fields. Leaving the wizard clears its step/version/loader; asynchronous catalog
+responses do not become a new installation selection. Submitted jobs retain their
+captured immutable inputs and cancellation behavior.
+
+Settings add five accent presets, custom #RRGGBB, and a native file chooser for local
+PNG/JPEG/WebP/GIF backgrounds. Colors are applied to actions/selection/focus with a
+contrasting primary-label color. Settings persist in the independent appearance
+record with backward-compatible defaults. Images decode off the UI thread with a
+32 MiB input/128 MiB decode limit, then feed both full-window scenery and Gaussian
+glass. GIF uses its static decoded frame. The original image is not modified/copied;
+the saved path is reopened on startup. Missing/invalid files retain the default scene
+and report an error. Choosing/resetting scenery does not alter other Amber products.
+
+This candidate is compile/package only at the user's request: no application,
+installer, UI, keyboard/IME, image/network, DPI or theme acceptance was performed.
+
+下拉箭头和窗口按钮使用矢量图形；Logo 改用品牌矢量稿。顶部导航固定且与页面分离，
+统一控件圆角和按钮尺寸。主题色、背景图可保存并在下次启动恢复，背景图原文件保持
+不变。安装向导重新进入时从版本选择开始。以上均待用户手动验收。

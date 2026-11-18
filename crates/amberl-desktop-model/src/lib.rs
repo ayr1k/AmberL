@@ -160,6 +160,12 @@ impl Model {
     pub fn appearance(&self) -> Result<ambrum::preferences::Appearance> {
         ambrum::preferences::appearance(&self.app)
     }
+    pub fn save_accent(&mut self, value: String) -> Result<()> {
+        ambrum::preferences::save_accent(&self.app, value)
+    }
+    pub fn save_background(&mut self, value: Option<PathBuf>) -> Result<()> {
+        ambrum::preferences::save_background(&self.app, value)
+    }
     pub fn save_appearance(&mut self, light: bool) -> Result<()> {
         ambrum::preferences::save_theme(&self.app, light)
     }

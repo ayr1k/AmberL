@@ -837,3 +837,87 @@ msgstr "Installation group files"
 
 msgid "按安装组管理，共享依赖会保留。修改过的文件会保留并停止操作。"
 msgstr "Manage installation groups. Shared dependencies are retained; modified files stop the operation and are preserved."
+
+msgid "撤销"
+msgstr "Undo"
+
+msgid "剪切"
+msgstr "Cut"
+
+msgid "复制"
+msgstr "Copy"
+
+msgid "粘贴"
+msgstr "Paste"
+
+msgid "全选"
+msgstr "Select all"
+
+msgid "资源"
+msgstr "Content"
+
+msgid "已下载"
+msgstr "Downloaded"
+
+msgid "推荐版本"
+msgstr "Recommended"
+
+msgid "不适配"
+msgstr "Incompatible"
+
+msgid "模组下载"
+msgstr "Download content"
+
+msgid "下载到当前实例"
+msgstr "Install in current instance"
+
+msgid "必要依赖"
+msgstr "Required dependencies"
+
+msgid "无必要依赖"
+msgstr "No required dependencies"
+
+msgid "可选依赖"
+msgstr "Optional dependencies"
+
+msgid "无可选依赖"
+msgstr "No optional dependencies"
+
+msgid "已取消必要依赖，游戏或模组可能无法启动。"
+msgstr "Required dependencies are unchecked. The game or mod may not start."
+
+msgid "已下载且校验通过的依赖不会重复下载。"
+msgstr "Verified installed dependencies are reused."
+
+msgid "正在核对…"
+msgstr "Checking…"
+
+msgid "正在核对版本与依赖…"
+msgstr "Checking version and dependencies…"
+
+msgid "安装到当前实例"
+msgstr "Install in current instance"
+
+msgid "主题色"
+msgstr "Accent color"
+
+msgid "自定义主题色"
+msgstr "Custom accent color"
+
+msgid "应用主题色"
+msgstr "Apply color"
+
+msgid "背景图片"
+msgstr "Background image"
+
+msgid "选择背景图片"
+msgstr "Choose background"
+
+msgid "恢复默认背景"
+msgstr "Default background"
+
+msgid "支持 PNG、JPEG、WebP、GIF。背景和主题色会在下次启动时恢复。"
+msgstr "Supports PNG, JPEG, WebP and GIF. The background and color are restored on startup."
+
+msgid "资源安装位置："
+msgstr "Content location: "

@@ -77,12 +77,51 @@ pub fn save(app: &Path, id: &str, preference: Launch) -> Result<()> {
     doc.save()
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Appearance {
     pub light: bool,
     #[serde(default)]
     pub english: bool,
+    #[serde(default = "default_accent")]
+    pub accent: String,
+    #[serde(default)]
+    pub background: Option<PathBuf>,
+}
+fn default_accent() -> String {
+    "#62d6b4".into()
+}
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            light: false,
+            english: false,
+            accent: default_accent(),
+            background: None,
+        }
+    }
+}
+pub fn save_accent(app: &Path, accent: String) -> Result<()> {
+    if accent.len() != 7
+        || !accent.starts_with('#')
+        || !accent[1..].bytes().all(|c| c.is_ascii_hexdigit())
+    {
+        return Err("请输入 #RRGGBB 格式的主题色".into());
+    }
+    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
+    doc.data.accent = accent;
+    doc.save()
+}
+pub fn save_background(app: &Path, path: Option<PathBuf>) -> Result<()> {
+    if path
+        .as_ref()
+        .is_some_and(|p| !p.is_absolute() || p.as_os_str().len() > 32760)
+    {
+        return Err("请选择本地背景图片".into());
+    }
+    let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;
+    doc.data.background = path;
+    doc.save()
 }
 pub fn save_theme(app: &Path, light: bool) -> Result<()> {
     let mut doc = Document::<Appearance>::open(app, "appearance-v1.json")?;

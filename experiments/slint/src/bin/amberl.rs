@@ -5,6 +5,8 @@ use slint::Model as _;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
 
+#[path = "../appearance.rs"]
+mod appearance;
 #[path = "../clipboard.rs"]
 mod clipboard;
 #[path = "../diagnostics.rs"]
@@ -77,6 +79,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
     let english = ui.global::<Locale>().get_english();
     let tr = |value: &str| -> SharedString { i18n::message(english, value).into() };
     ui.set_login_remaining(model.login_remaining());
+    ui.set_window_maximized(ui.window().is_maximized());
     if view.memory_value != ui.get_memory_mib() {
         let memory = memory_values(ui.get_memory_mib());
         ui.set_memory_options(strings(memory.iter().map(|n| format!("{n} MiB")).collect()));
@@ -153,10 +156,26 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
             view.content_projects = projects;
         }
         if versions != view.content_versions {
-            ui.set_content_version_index(if versions.is_empty() { -1 } else { 0 });
+            ui.set_content_version_index(
+                c.versions
+                    .iter()
+                    .position(|v| v.recommended)
+                    .or_else(|| c.versions.iter().position(|v| v.compatible))
+                    .map_or(-1, |i| i as i32),
+            );
+            ui.set_content_expanded_group(
+                c.context
+                    .as_ref()
+                    .map_or("", |ctx| ctx.game.as_str())
+                    .into(),
+            );
             view.content_versions = versions;
         }
         if groups != view.content_groups {
+            if c.plan.is_some() && groups.len() > view.content_groups.len() {
+                ui.set_content_step(0);
+                ui.set_content_tab(1);
+            }
             ui.set_content_group_index(-1);
             view.content_groups = groups;
         }
@@ -167,6 +186,18 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
             view.content_plan = c.planned_version.clone();
         }
         ui.set_content_target(i18n::content_target(english, &c.title).into());
+        ui.set_content_destination(match c.target.as_ref() {
+            Some(ambrum::content::Target::Client { root, .. }) => root
+                .join(match c.kind.as_str() {
+                    "resourcepack" => "resourcepacks",
+                    "shader" => "shaderpacks",
+                    _ => "mods",
+                })
+                .display()
+                .to_string()
+                .into(),
+            _ => "".into(),
+        });
         ui.set_content_group_states(strings(c.groups.iter().map(|g| g.state.clone()).collect()));
         ui.set_content_offset(c.offset as i32);
         ui.set_content_total(c.total as i32);
@@ -185,6 +216,7 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                     title: p.title.as_str().into(),
                     icon: view.thumbnails.image(p.icon_url.as_deref()),
                     has_icon: view.thumbnails.has(p.icon_url.as_deref()),
+                    downloaded: c.downloaded.iter().any(|(id, _)| id == &p.id),
                     initial: p.title.chars().next().unwrap_or('•').to_string().into(),
                     description: p.description.as_str().into(),
                     meta: format!(
@@ -204,6 +236,67 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                 .map(|v| i18n::subtitle(english, &v.title))
                 .collect(),
         ));
+        ui.set_content_version_rows(ModelRc::new(VecModel::from(
+            c.versions
+                .iter()
+                .enumerate()
+                .map(|(index, v)| ContentVersionRow {
+                    index: index as i32,
+                    title: v.title.as_str().into(),
+                    details: i18n::subtitle(english, &v.details).into(),
+                    game: v.game.as_str().into(),
+                    recommended: v.recommended,
+                    compatible: v.compatible,
+                    downloaded: c.downloaded.iter().any(|(_, version)| version == &v.id),
+                })
+                .collect::<Vec<_>>(),
+        )));
+        let make_version =
+            |index: usize, v: &ambrum::content::modrinth::Version| ContentVersionRow {
+                index: index as i32,
+                title: v.title.as_str().into(),
+                details: i18n::subtitle(english, &v.details).into(),
+                game: v.game.as_str().into(),
+                recommended: v.recommended,
+                compatible: v.compatible,
+                downloaded: c.downloaded.iter().any(|(_, id)| id == &v.id),
+            };
+        ui.set_content_recommendations(ModelRc::new(VecModel::from(
+            c.versions
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| v.recommended)
+                .map(|(i, v)| make_version(i, v))
+                .collect::<Vec<_>>(),
+        )));
+        let mut version_groups = vec![];
+        for v in &c.versions {
+            if !version_groups.contains(&v.game) {
+                version_groups.push(v.game.clone());
+            }
+        }
+        ui.set_content_version_groups(ModelRc::new(VecModel::from(
+            version_groups
+                .into_iter()
+                .map(|game| ContentVersionGroup {
+                    title: game.as_str().into(),
+                    rows: ModelRc::new(VecModel::from(
+                        c.versions
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, v)| v.game == game && !v.recommended)
+                            .map(|(i, v)| make_version(i, v))
+                            .collect::<Vec<_>>(),
+                    )),
+                })
+                .collect::<Vec<_>>(),
+        )));
+        ui.set_content_recommended_index(
+            c.versions
+                .iter()
+                .position(|v| v.recommended)
+                .map_or(-1, |i| i as i32),
+        );
         filter_installed(ui, model);
         ui.set_content_preview(
             c.preview()
@@ -220,11 +313,87 @@ fn refresh(ui: &Launcher, model: &Model, view: &mut View) {
                     .iter()
                     .map(|o| OptionalRow {
                         title: o.title.as_str().into(),
+                        icon: view.thumbnails.image(
+                            c.projects
+                                .iter()
+                                .find(|p| p.id == o.project)
+                                .and_then(|p| p.icon_url.as_deref()),
+                        ),
+                        has_icon: view.thumbnails.has(
+                            c.projects
+                                .iter()
+                                .find(|p| p.id == o.project)
+                                .and_then(|p| p.icon_url.as_deref()),
+                        ),
                         selected: o.selected,
+                        downloaded: c.downloaded.iter().any(|(p, v)| {
+                            p == &o.project && (o.version.is_empty() || v == &o.version)
+                        }),
                     })
                     .collect()
             },
         ))));
+        ui.set_content_required(ModelRc::new(VecModel::from(c.plan.as_ref().map_or_else(
+            Vec::new,
+            |p| {
+                p.required
+                    .iter()
+                    .map(|o| OptionalRow {
+                        title: o.title.as_str().into(),
+                        icon: view.thumbnails.image(
+                            c.projects
+                                .iter()
+                                .find(|p| p.id == o.project)
+                                .and_then(|p| p.icon_url.as_deref()),
+                        ),
+                        has_icon: view.thumbnails.has(
+                            c.projects
+                                .iter()
+                                .find(|p| p.id == o.project)
+                                .and_then(|p| p.icon_url.as_deref()),
+                        ),
+                        selected: o.selected,
+                        downloaded: c.downloaded.iter().any(|(id, v)| {
+                            id == &o.project && (o.version.is_empty() || v == &o.version)
+                        }),
+                    })
+                    .collect()
+            },
+        ))));
+        ui.set_content_skipped_required(c.plan.as_ref().map_or(0, |p| {
+            p.required.iter().filter(|r| !r.selected).count() as i32
+        }));
+        ui.set_content_plan_files(ModelRc::new(VecModel::from(c.plan.as_ref().map_or_else(
+            Vec::new,
+            |p| {
+                p.files
+                    .iter()
+                    .take(1)
+                    .map(|f| PlanRow {
+                        title: f.title.as_str().into(),
+                        path: f.path.as_str().into(),
+                        downloaded: c
+                            .downloaded
+                            .iter()
+                            .any(|(id, v)| id == &f.project && v == &f.version),
+                    })
+                    .collect()
+            },
+        ))));
+        ui.set_content_plan_summary(
+            c.plan
+                .as_ref()
+                .map_or_else(String::new, |p| {
+                    format!(
+                        "{} · {} {} · {:.1} MiB",
+                        i18n::text(english, "所选版本"),
+                        p.files.len(),
+                        i18n::text(english, "个文件"),
+                        p.files.iter().map(|f| f.artifact.size).sum::<u64>() as f64 / 1048576.0
+                    )
+                })
+                .into(),
+        );
         ui.set_content_has_plan(c.plan.is_some());
         view.content_revision = c.revision;
     }
@@ -521,6 +690,19 @@ fn save_choice(ui: &Launcher, model: &mut Model, view: &View) -> ambrum::Result<
         memory_mib: u32::try_from(ui.get_memory_mib()).map_err(|_| "无效内存")?,
     })
 }
+fn apply_accent(ui: &Launcher, value: &str) {
+    if let Some(color) = appearance::color(value) {
+        let rgb = u32::from_str_radix(&value[1..], 16).unwrap_or(0x62d6b4);
+        let luminance = ((rgb >> 16) & 255) * 299 + ((rgb >> 8) & 255) * 587 + (rgb & 255) * 114;
+        ui.global::<Theme>().set_brand(color);
+        ui.global::<Theme>().set_primary_ink(if luminance > 150000 {
+            slint::Color::from_rgb_u8(16, 32, 28)
+        } else {
+            slint::Color::from_rgb_u8(255, 255, 255)
+        });
+        ui.set_accent_input(value.into());
+    }
+}
 fn memory_values(current: i32) -> Vec<i32> {
     let mut values = vec![
         512, 1024, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768, 49152, 65536,
@@ -577,6 +759,7 @@ fn filter_installed(ui: &Launcher, model: &Model) {
                 title: g.title.as_str().into(),
                 icon: slint::Image::default(),
                 has_icon: false,
+                downloaded: g.state == "installed",
                 initial: g.title.chars().next().unwrap_or('•').to_string().into(),
                 description: g.details().lines().next().unwrap_or("").into(),
                 meta: format!(
@@ -602,6 +785,12 @@ fn filter_installed(ui: &Launcher, model: &Model) {
     }
 }
 fn content_bindings(ui: &Launcher, model: &Rc<RefCell<Model>>) {
+    {
+        let model = model.clone();
+        ui.on_select_required(move |index, selected| {
+            operation(&model, |m| m.select_required_content(index, selected))
+        });
+    }
     {
         let model = model.clone();
         ui.on_select_optional(move |index, selected| {
@@ -1120,14 +1309,35 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     ui.global::<Theme>().set_motion(animations != 0);
-    let glass = RefCell::new(glass::Glass::new()?);
-    ui.global::<GlassAssets>()
-        .on_tile(move |x, y, w, h, vw, vh| glass.borrow_mut().tile([x, y, w, h, vw, vh]));
+    let glass = Rc::new(RefCell::new(glass::Glass::new()?));
+    let backgrounds = Rc::new(RefCell::new(appearance::Loader::default()));
+    {
+        let glass = glass.clone();
+        ui.global::<GlassAssets>()
+            .on_tile(move |x, y, w, h, vw, vh, _revision| {
+                glass.borrow_mut().tile([x, y, w, h, vw, vh])
+            });
+    }
     ui.global::<GlassAssets>().set_ready(true);
     let model = Rc::new(RefCell::new(Model::new(app)));
     match model.borrow().appearance() {
         Ok(saved) => {
             ui.invoke_apply_appearance(saved.light);
+            apply_accent(&ui, &saved.accent);
+            ui.set_background_name(
+                saved
+                    .background
+                    .as_ref()
+                    .map_or_else(
+                        || i18n::text(saved.english, "默认森林背景").to_owned(),
+                        |p| p.display().to_string(),
+                    )
+                    .into(),
+            );
+            if saved.background.is_some() {
+                backgrounds.borrow_mut().start(saved.background)?;
+                ui.set_appearance_busy(true);
+            }
             slint::select_bundled_translation(if saved.english { "en_US" } else { "" })?;
             ui.global::<Locale>().set_english(saved.english);
         }
@@ -1145,6 +1355,49 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Err(error) => model.borrow_mut().report(error),
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let model = model.clone();
+        ui.on_set_accent(move |value| {
+            let result = model.borrow_mut().save_accent(value.to_string());
+            match result {
+                Ok(()) => {
+                    if let Some(u) = weak.upgrade() {
+                        apply_accent(&u, &value);
+                    }
+                }
+                Err(e) => model.borrow_mut().report(e),
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let backgrounds = backgrounds.clone();
+        let model = model.clone();
+        ui.on_choose_background(move || {
+            if let Some(u) = weak.upgrade() {
+                if let Some(path) = appearance::pick(u.window()) {
+                    match backgrounds.borrow_mut().start(Some(path)) {
+                        Ok(()) => u.set_appearance_busy(true),
+                        Err(e) => model.borrow_mut().report(e),
+                    }
+                }
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let backgrounds = backgrounds.clone();
+        let model = model.clone();
+        ui.on_reset_background(move || {
+            if let Some(u) = weak.upgrade() {
+                match backgrounds.borrow_mut().start(None) {
+                    Ok(()) => u.set_appearance_busy(true),
+                    Err(e) => model.borrow_mut().report(e),
+                }
             }
         });
     }
@@ -1574,6 +1827,38 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             move || {
                 model.borrow_mut().tick();
                 if let Some(ui) = weak.upgrade() {
+                    if let Some((path, result)) = backgrounds.borrow_mut().poll() {
+                        ui.set_appearance_busy(false);
+                        match result {
+                            Ok(scene) => {
+                                let saved = model.borrow_mut().save_background(path.clone());
+                                match saved {
+                                    Ok(()) => {
+                                        ui.set_background_image(
+                                            glass.borrow_mut().replace(scene.pixels, scene.blurred),
+                                        );
+                                        let assets = ui.global::<GlassAssets>();
+                                        assets.set_revision(assets.get_revision() + 1);
+                                        ui.set_background_name(
+                                            path.map_or_else(
+                                                || {
+                                                    i18n::text(
+                                                        ui.global::<Locale>().get_english(),
+                                                        "默认森林背景",
+                                                    )
+                                                    .to_owned()
+                                                },
+                                                |p| p.display().to_string(),
+                                            )
+                                            .into(),
+                                        );
+                                    }
+                                    Err(e) => model.borrow_mut().report(e),
+                                }
+                            }
+                            Err(e) => model.borrow_mut().report(e),
+                        }
+                    }
                     // Winit creates its native window only after entering the event loop.
                     if !fitted.get() {
                         fitted.set(window::fit(ui.window()));

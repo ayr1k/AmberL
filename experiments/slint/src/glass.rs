@@ -23,6 +23,17 @@ impl Glass {
             tiles: vec![],
         })
     }
+    pub fn replace(&mut self, pixels: RgbaImage, blurred: RgbaImage) -> Image {
+        self.blurred = blurred;
+        self.size = (0, 0);
+        self.tiles.clear();
+        self.viewport = RgbaImage::new(0, 0);
+        Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+            pixels.as_raw(),
+            pixels.width(),
+            pixels.height(),
+        ))
+    }
     pub fn tile(&mut self, geometry: [f32; 6]) -> Image {
         let [x, y, width, height, vw, vh] = geometry;
         if geometry.iter().any(|n| !n.is_finite())

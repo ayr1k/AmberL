@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
+mod cache;
+pub fn clear_metadata_cache() {
+    cache::clear();
+}
 use crate::{
     Result,
     catalog::bounded,
@@ -40,6 +44,10 @@ pub struct Project {
 pub struct Version {
     pub id: String,
     pub title: String,
+    pub game: String,
+    pub details: String,
+    pub recommended: bool,
+    pub compatible: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct File {
@@ -51,6 +59,8 @@ pub struct File {
 }
 #[derive(Clone)]
 pub struct OptionalDependency {
+    pub project: String,
+    pub version: String,
     pub key: String,
     pub title: String,
     pub selected: bool,
@@ -60,6 +70,7 @@ pub struct Plan {
     pub context: Context,
     pub files: Vec<File>,
     pub optional: Vec<OptionalDependency>,
+    pub required: Vec<OptionalDependency>,
     pub incompatible: Vec<String>,
 }
 fn id(s: &str) -> Result<()> {
@@ -86,12 +97,19 @@ fn encoded(s: &str) -> String {
         .collect()
 }
 fn get(path: &str, c: &Cancellation) -> Result<Value> {
-    serde_json::from_slice(&bounded(
-        &Https,
-        &format!("https://api.modrinth.com/v2/{path}"),
-        c,
-    )?)
-    .map_err(|_| "Invalid Modrinth response".into())
+    let fetch = || {
+        serde_json::from_slice(&bounded(
+            &Https,
+            &format!("https://api.modrinth.com/v2/{path}"),
+            c,
+        )?)
+        .map_err(|_| "Invalid Modrinth response".into())
+    };
+    if path.starts_with("project/") || path.starts_with("version/") {
+        cache::get(path, c, fetch)
+    } else {
+        fetch()
+    }
 }
 fn text(v: &Value, key: &str) -> Result<String> {
     let s = v[key].as_str().ok_or("Missing content field")?;
@@ -317,23 +335,69 @@ pub fn versions_with_filters(
     browse: Browse,
     c: &Cancellation,
 ) -> Result<Vec<Version>> {
-    browse_catalog(project, kind, context, browse, c)?
+    let rows = browse_catalog(project, kind, context, browse, c)?;
+    let recommended = rows
         .iter()
-        .map(|v| {
+        .position(|v| {
+            compatible(v, context, kind).is_ok()
+                && v["featured"] == true
+                && v["version_type"] == "release"
+        })
+        .or_else(|| {
+            rows.iter().position(|v| {
+                compatible(v, context, kind).is_ok() && v["version_type"] == "release"
+            })
+        })
+        .or_else(|| {
+            rows.iter()
+                .position(|v| compatible(v, context, kind).is_ok())
+        });
+    rows.iter()
+        .enumerate()
+        .map(|(i, v)| {
             let version = text(v, "id")?;
             id(&version)?;
+            let games = v["game_versions"]
+                .as_array()
+                .ok_or("Missing game versions")?;
+            let game = if games.iter().any(|g| g == &context.game) {
+                context.game.clone()
+            } else {
+                games
+                    .last()
+                    .and_then(Value::as_str)
+                    .unwrap_or("Other")
+                    .chars()
+                    .take(64)
+                    .collect()
+            };
+            let loaders = v["loaders"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Value::as_str)
+                        .take(8)
+                        .collect::<Vec<_>>()
+                        .join(" / ")
+                })
+                .unwrap_or_default();
             Ok(Version {
                 id: version,
-                title: format!(
-                    "{} · {}{}",
-                    text(v, "name")?,
+                title: text(v, "name")?,
+                game,
+                details: format!(
+                    "{} · {} · {}",
                     text(v, "version_type")?,
-                    if compatible(v, context, kind).is_ok() {
-                        ""
-                    } else {
-                        " · 不匹配当前实例"
-                    }
+                    loaders,
+                    v["date_published"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(19)
+                        .collect::<String>()
                 ),
+                recommended: Some(i) == recommended,
+                compatible: compatible(v, context, kind).is_ok(),
             })
         })
         .collect()
@@ -434,9 +498,30 @@ pub fn plan_with_choices(
     choices: &BTreeSet<String>,
     c: &Cancellation,
 ) -> Result<Plan> {
+    plan_with_dependencies(version, kind, context, choices, &BTreeSet::new(), c)
+}
+pub fn plan_with_dependencies(
+    version: &str,
+    kind: &str,
+    context: &Context,
+    choices: &BTreeSet<String>,
+    excluded: &BTreeSet<String>,
+    c: &Cancellation,
+) -> Result<Plan> {
+    plan_with_installed_dependencies(version, kind, context, choices, excluded, &[], c)
+}
+pub fn plan_with_installed_dependencies(
+    version: &str,
+    kind: &str,
+    context: &Context,
+    choices: &BTreeSet<String>,
+    excluded: &BTreeSet<String>,
+    installed: &[(String, String)],
+    c: &Cancellation,
+) -> Result<Plan> {
     id(version)?;
     filters(context, kind)?;
-    if choices.len() > 128 {
+    if choices.len() > 128 || excluded.len() > 128 {
         return Err("Dependency selection limit".into());
     }
     let mut pending = vec![(version.to_owned(), kind.to_owned())];
@@ -444,6 +529,7 @@ pub fn plan_with_choices(
     let mut paths = BTreeSet::new();
     let mut files = vec![];
     let mut optional = vec![];
+    let mut required = vec![];
     let mut incompatible = vec![];
     let mut total = 0u64;
     while let Some((id, kind)) = pending.pop() {
@@ -496,33 +582,52 @@ pub fn plan_with_choices(
             let version = d["version_id"].as_str();
             match d["dependency_type"].as_str() {
                 Some("required") | Some("optional") => {
-                    if d["dependency_type"] == "optional" {
-                        let (key, title) = if let Some(v) = version {
+                    let optional_kind = d["dependency_type"] == "optional";
+                    let (key, title, dependency_project, dependency_version) =
+                        if let Some(v) = version {
                             id_check(v)?;
+                            let meta = get(&format!("version/{v}"), c)?;
+                            let p = text(&meta, "project_id")?;
+                            id_check(&p)?;
                             (
                                 format!("version:{v}"),
-                                text(&get(&format!("version/{v}"), c)?, "name")?,
+                                text(&meta, "name")?,
+                                p,
+                                v.to_owned(),
                             )
                         } else if let Some(p) = project {
                             id_check(p)?;
                             (
                                 format!("project:{p}"),
                                 text(&get(&format!("project/{p}"), c)?, "title")?,
+                                p.to_owned(),
+                                String::new(),
                             )
                         } else {
-                            return Err("Optional dependency lacks an identity".into());
+                            return Err("Dependency lacks an identity".into());
                         };
-                        let selected = choices.contains(&key);
-                        if !optional.iter().any(|o: &OptionalDependency| o.key == key) {
-                            optional.push(OptionalDependency {
-                                key,
-                                title,
-                                selected,
-                            });
-                        }
-                        if !selected {
-                            continue;
-                        }
+                    let selected = if optional_kind {
+                        choices.contains(&key)
+                    } else {
+                        !excluded.contains(&key)
+                    };
+                    let dependency_key = key.clone();
+                    let list = if optional_kind {
+                        &mut optional
+                    } else {
+                        &mut required
+                    };
+                    if !list.iter().any(|o: &OptionalDependency| o.key == key) {
+                        list.push(OptionalDependency {
+                            key,
+                            title,
+                            project: dependency_project,
+                            version: dependency_version,
+                            selected,
+                        });
+                    }
+                    if !selected {
+                        continue;
                     }
                     let next = if let Some(v) = version {
                         id_check(v)?;
@@ -534,11 +639,19 @@ pub fn plan_with_choices(
                         let rows = catalog(p, &project_kind(&dependency, context)?, context, c)?;
                         let best = rows
                             .iter()
-                            .find(|r| r["version_type"] == "release")
+                            .find(|r| {
+                                installed.iter().any(|(project, version)| {
+                                    project == p && r["id"] == version.as_str()
+                                })
+                            })
+                            .or_else(|| rows.iter().find(|r| r["version_type"] == "release"))
                             .or(rows.first())
                             .ok_or("找不到兼容的必需依赖")?;
                         text(best, "id")?
                     };
+                    if let Some(row) = list.iter_mut().find(|row| row.key == dependency_key) {
+                        row.version = next.clone();
+                    }
                     pending.push((next, String::new()));
                 }
                 Some("incompatible") => {
@@ -555,21 +668,19 @@ pub fn plan_with_choices(
                 _ => return Err("Unknown dependency relationship".into()),
             }
         }
+        if required.len() + optional.len() > 128 {
+            return Err("Dependency choice limit".into());
+        }
         files.push(f);
     }
     if incompatible.iter().any(|id| seen.contains_key(id)) {
         return Err("所选内容存在互斥依赖".into());
     }
-    if choices
-        .iter()
-        .any(|key| !optional.iter().any(|o| &o.key == key))
-    {
-        return Err("可选依赖已变化，请重新预览".into());
-    }
     Ok(Plan {
         context: context.clone(),
         files,
         optional,
+        required,
         incompatible,
     })
 }

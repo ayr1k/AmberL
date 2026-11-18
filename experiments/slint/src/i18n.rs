@@ -5,6 +5,14 @@ pub fn text(english: bool, value: &str) -> &str {
         return value;
     }
     match value {
+        "默认森林背景" => "Default forest background",
+        "所选版本" => "Selected version",
+        "请输入 #RRGGBB 格式的主题色" => "Enter an accent color in #RRGGBB format",
+        "请选择本地背景图片" => "Choose a local background image",
+        "无法打开背景图" => "Cannot open background image",
+        "无法读取背景图" => "Cannot read background image",
+        "背景图片不能超过 32 MiB" => "Background images must not exceed 32 MiB",
+        "不支持或过大的背景图片" => "Unsupported or oversized background image",
         "次下载" => "downloads",
         "个文件" => "files",
         "正在加载兼容内容…" => "Loading compatible content…",

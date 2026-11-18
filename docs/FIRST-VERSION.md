@@ -1,6 +1,15 @@
 # First-version completion ledger / 首版完成清单
 
 
+## 2026-11-18 candidate — manual acceptance pending
+
+Vector controls/logo, unified fields, fixed header, reset installation wizard,
+visible Content navigation, richer version/dependency cards, recommended defaults,
+required/optional dependency choices, verified Downloaded badges, and persistent
+accent/background settings are implemented for this candidate. See CONTENT.md and
+NATIVE-UI.md. Only compilation and packaging are performed, per the user's standing
+instruction; no new test or runtime acceptance is claimed. No merge/release authorized.
+
 ## Latest content UI candidate (manual acceptance pending)
 
 The user reported persistent dropdown outlines, numeric-only memory selection, empty
