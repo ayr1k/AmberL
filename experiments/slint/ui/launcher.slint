@@ -1018,11 +1018,11 @@ export component Launcher inherits Window {
         TouchArea { }
         Glass { x: (parent.width - self.width)/2; y: 16px; width: min(760px,parent.width - 64px); height: parent.height - 36px;
             viewport-width: root.width; viewport-height: root.height; scene-x: self.x; scene-y: self.y + 92px; tint: Theme.light ? #f4faf5f5 : #14262ff5;
-            VerticalLayout { padding: 24px; spacing: 12px; alignment: start;
+            VerticalLayout { padding: root.height < 640px ? 16px : 24px; spacing: root.height < 640px ? 8px : 12px; alignment: start;
                 Text { text: @tr("模组下载") + " · " + root.content-project-title; color: Theme.text; font-size: 22px; font-weight: 600; vertical-stretch: 0; overflow: elide; }
                 Text { text: @tr("下载到当前实例") + " · " + root.content-target; color: Theme.accent; font-size: 13px; vertical-stretch: 0; }
                 if !root.content-server: Text {text:root.content-destination;color:Theme.secondary;font-size:12px;vertical-stretch:0;overflow:elide;}
-                ScrollView { min-height: 80px; vertical-stretch: 1; content-width: self.width;
+                ScrollView { min-height: 48px; vertical-stretch: 1; content-width: self.width;
                     VerticalLayout { spacing: 10px; alignment: start;
                         Text { text: root.content-plan-summary; color: Theme.text; font-weight: 600; vertical-stretch: 0; }
                         for file in root.content-plan-files: Rectangle { height: 58px; background: Theme.control; border-radius: Theme.radius;
